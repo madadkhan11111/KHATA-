@@ -11,6 +11,8 @@ const AccountCloud = {
     ready: false,
     syncTimer: null,
     syncing: false,
+    pendingSync: false,
+    lastSyncError: '',
 
     isConfigured() {
         const cfg = window.KHATA_CONFIG?.firebase;
@@ -34,6 +36,11 @@ const AccountCloud = {
                 : firebase.initializeApp(window.KHATA_CONFIG.firebase);
             this.auth = firebase.auth();
             this.db = firebase.firestore();
+            try {
+                this.db.settings({ ignoreUndefinedProperties: true });
+            } catch (_) {
+                /* settings may only be called once */
+            }
             this.ready = true;
 
             this.auth.onAuthStateChanged(async (user) => {
@@ -146,6 +153,7 @@ const AccountCloud = {
         if (typeof showToast === 'function') {
             showToast(`Signed in as ${user.email || 'user'}`, 'success');
         }
+        await this.pushToCloud(false);
     },
 
     updateAccountWidgets() {
@@ -155,12 +163,18 @@ const AccountCloud = {
         const emailEl = document.getElementById('account-user-email');
         const profileStatus = document.querySelector('.profile-mini .status');
 
-        if (indicator) indicator.textContent = this.user ? 'Firebase: Synced' : 'Firebase: Sign in';
+        if (indicator) {
+            if (!this.user) indicator.textContent = 'Firebase: Sign in';
+            else if (this.lastSyncError) indicator.textContent = 'Firebase: Save failed';
+            else indicator.textContent = 'Firebase: Synced';
+        }
         if (emailEl) emailEl.textContent = email || 'Not signed in';
         if (status) {
-            status.textContent = this.user
-                ? 'Your data saves automatically to Firebase Cloud.'
-                : 'Sign in to sync with Firebase.';
+            status.textContent = this.lastSyncError
+                ? this.lastSyncError
+                : (this.user
+                    ? 'Your data saves automatically to Firebase Cloud.'
+                    : 'Sign in to sync with Firebase.');
         }
         if (profileStatus) profileStatus.textContent = email ? email.split('@')[0] : 'Guest';
     },
@@ -231,37 +245,94 @@ const AccountCloud = {
     },
 
     docRef() {
-        if (!this.user) return null;
+        if (!this.user || !this.db) return null;
         return this.db.collection('users').doc(this.user.uid);
+    },
+
+    dataWeight(data) {
+        if (!data) return 0;
+        const customers = Array.isArray(data.customers) ? data.customers : [];
+        const rooz = Array.isArray(data.rooznamcha) ? data.rooznamcha : [];
+        const trash = Array.isArray(data.trash) ? data.trash : [];
+        const tx = customers.reduce((n, c) => n + (Array.isArray(c.transactions) ? c.transactions.length : 0), 0);
+        return customers.length * 10 + rooz.length * 5 + tx + trash.length;
+    },
+
+    sanitizeData(data) {
+        try {
+            return JSON.parse(JSON.stringify(data ?? {}));
+        } catch (_) {
+            return {
+                customers: [],
+                rooznamcha: [],
+                trash: [],
+                settings: { shopName: 'My Business', currency: 'Rs.', language: 'en', nextKhataNo: 1, nextTransactionNo: 1001 }
+            };
+        }
     },
 
     async loadFromCloud() {
         const ref = this.docRef();
-        if (!ref) return;
+        if (!ref || typeof db === 'undefined') return;
         try {
             const snap = await ref.get();
+            const localWeight = this.dataWeight(db.data);
+
             if (snap.exists) {
                 const remote = snap.data()?.khataData;
-                if (remote && remote.customers && remote.rooznamcha) {
-                    db.data = remote;
-                    if (!db.data.trash) db.data.trash = [];
-                    localStorage.setItem('khata-data', JSON.stringify(db.data));
-                    return;
+                const remoteWeight = this.dataWeight(remote);
+                if (remote && Array.isArray(remote.customers) && Array.isArray(remote.rooznamcha)) {
+                    if (remoteWeight >= localWeight && remoteWeight > 0) {
+                        db.data = remote;
+                        if (!db.data.trash) db.data.trash = [];
+                        if (!db.data.settings) {
+                            db.data.settings = {
+                                shopName: 'My Business',
+                                currency: 'Rs.',
+                                language: 'en',
+                                nextKhataNo: 1,
+                                nextTransactionNo: 1001
+                            };
+                        }
+                        localStorage.setItem('khata-data', JSON.stringify(db.data));
+                        this.lastSyncError = '';
+                        return;
+                    }
                 }
             }
-            await this.pushToCloud();
+            await this.pushToCloud(false);
         } catch (err) {
             console.error('Firebase load failed', err);
+            this.lastSyncError = this.friendlyError(err);
             if (typeof showToast === 'function') {
-                showToast('Could not load Firebase data. Working offline until reconnect.', 'error');
+                showToast('Cloud load failed: ' + this.lastSyncError, 'error');
             }
+            try { await this.pushToCloud(false); } catch (_) { /* ignore */ }
         }
+    },
+
+    friendlyError(err) {
+        const code = err?.code || '';
+        const msg = err?.message || String(err || 'Unknown error');
+        if (code === 'permission-denied' || /permission/i.test(msg)) {
+            return 'Permission denied — publish Firestore rules for users/{userId}.';
+        }
+        if (/API has not been used|service_disabled|Firestore/i.test(msg) && /enable|disabled|not been used/i.test(msg)) {
+            return 'Create Firestore Database in Firebase Console first.';
+        }
+        if (/offline|unavailable|Failed to get document/i.test(msg)) {
+            return 'Offline or Firestore not ready. Check internet + Firestore setup.';
+        }
+        if (/undefined/i.test(msg)) {
+            return 'Invalid data field (undefined). Retrying with cleaned data.';
+        }
+        return msg.slice(0, 140);
     },
 
     queueSync() {
         if (!this.user || !this.ready) return;
         clearTimeout(this.syncTimer);
-        this.syncTimer = setTimeout(() => this.pushToCloud(), 800);
+        this.syncTimer = setTimeout(() => this.pushToCloud(false), 500);
     },
 
     async syncNow(showMsg = false) {
@@ -271,25 +342,45 @@ const AccountCloud = {
 
     async pushToCloud(showMsg = false) {
         const ref = this.docRef();
-        if (!ref || this.syncing) return;
+        if (!ref || typeof db === 'undefined') return;
+
+        if (this.syncing) {
+            this.pendingSync = true;
+            return;
+        }
+
         this.syncing = true;
         const indicator = document.getElementById('backup-indicator-text');
         if (indicator) indicator.textContent = 'Firebase: Saving…';
+
         try {
+            localStorage.setItem('khata-data', JSON.stringify(db.data));
+
+            const payload = this.sanitizeData(db.data);
             await ref.set({
                 email: this.user.email || '',
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                khataData: db.data
+                khataData: payload
             }, { merge: true });
+
+            this.lastSyncError = '';
             if (indicator) indicator.textContent = 'Firebase: Synced';
-            if (showMsg && typeof showToast === 'function') showToast('Firebase sync complete', 'success');
+            if (showMsg && typeof showToast === 'function') showToast('Saved to Firebase Cloud', 'success');
             this.updateAccountWidgets();
         } catch (err) {
             console.error('Firebase save failed', err);
-            if (indicator) indicator.textContent = 'Firebase: Offline';
-            if (showMsg && typeof showToast === 'function') showToast('Firebase sync failed: ' + err.message, 'error');
+            this.lastSyncError = this.friendlyError(err);
+            if (indicator) indicator.textContent = 'Firebase: Save failed';
+            if (typeof showToast === 'function') {
+                showToast('Save failed: ' + this.lastSyncError, 'error');
+            }
+            this.updateAccountWidgets();
         } finally {
             this.syncing = false;
+            if (this.pendingSync) {
+                this.pendingSync = false;
+                setTimeout(() => this.pushToCloud(false), 300);
+            }
         }
     },
 

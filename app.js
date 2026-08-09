@@ -80,9 +80,14 @@ class DataManager {
                 this.redoStack = []; // Clear redo stack on new action
             }
         }
-        localStorage.setItem('khata-data', JSON.stringify(this.data));
+        try {
+            localStorage.setItem('khata-data', JSON.stringify(this.data));
+        } catch (err) {
+            console.error('localStorage save failed', err);
+            if (typeof showToast === 'function') showToast('Local save failed: storage full or blocked', 'error');
+        }
         this.updateUndoRedoButtons();
-        if (window.AccountCloud) AccountCloud.queueSync();
+        if (window.AccountCloud && AccountCloud.user) AccountCloud.queueSync();
     }
 
     undo() {
