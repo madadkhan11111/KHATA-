@@ -7,14 +7,13 @@ window.KHATA_CONFIG = {
   websiteUrl: "https://madadkhan11111.github.io/KHATA-/",
   desktopDownloadUrl: null,
 
-  // Paste Firebase web config from:
-  // Firebase Console → Project settings → Your apps → SDK setup
   firebase: {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyD3aG3gWDT6epkaJtpqSiK4f_gt4zKQUXM",
+    authDomain: "khata-your.firebaseapp.com",
+    projectId: "khata-your",
+    storageBucket: "khata-your.firebasestorage.app",
+    messagingSenderId: "464630214526",
+    appId: "1:464630214526:web:2f4613d35efa814ddc4d2f",
+    measurementId: "G-4HT5KEWVM8"
   }
 };
