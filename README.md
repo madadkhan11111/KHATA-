@@ -51,16 +51,23 @@ Installer build (`npm run dist`) may require running Command Prompt as Administr
 
 Set that URL in `site-config.js` as `websiteUrl`.
 
-## GitHub cloud data backup
+## Accounts for users worldwide
 
-Business data is **not** stored in the public website repo (that would expose customer ledgers).
+The **website** is on GitHub Pages.  
+**User ledgers** are private in Firebase (each user only sees their own data).
 
-Instead, in the app go to **Settings → GitHub Cloud Backup**:
+Why not store all user data in the GitHub repo? That would make customer ledgers public. Firebase keeps each account private and works for shops worldwide.
 
-1. Create a token at https://github.com/settings/tokens (scope: `gist`)
-2. Paste token → **Save Token & Connect**
-3. **Upload Data to GitHub** (creates a private Gist)
-4. On another device: same token → **Restore Data from GitHub**
+### One-time owner setup (free)
 
-Token stays only in your browser (`localStorage`), not in the published website files.
+1. Open https://console.firebase.google.com/ → Create project  
+2. Build → Authentication → enable **Email/Password** and **Google**  
+3. Build → Firestore Database → Create database  
+4. Paste rules from `firestore.rules`  
+5. Project settings → Your apps → Web → copy config into `site-config.js` → `firebase: { ... }`  
+6. Add authorized domain: `madadkhan11111.github.io`  
+7. Push/redeploy
+
+Then any user can open the site, **Create Account**, and their data syncs automatically (no manual backup folder).
+
 
