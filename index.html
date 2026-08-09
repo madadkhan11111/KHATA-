@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>KhataBook Pro - Premium Ledger & Daily Cash Book</title>
+    <meta name="description" content="Professional Khata Book and Rooznamcha software for modern business management. Track customers, daily cash book, reports, and auto-backup.">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="application-version" content="1.0.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="KhataPro">
+    <meta property="og:title" content="KhataBook Pro - Ledger & Daily Cash Book">
+    <meta property="og:description" content="Professional Khata Book and Rooznamcha for shops and small businesses.">
+    <meta property="og:type" content="website">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="icon.ico" type="image/x-icon">
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="dark-theme">
+    <noscript>
+        <p style="padding:2rem;text-align:center;font-family:sans-serif;">KhataBook Pro requires JavaScript. Please enable it in your browser.</p>
+    </noscript>
+    <div class="app-container">
+        <div id="sidebar-overlay" class="sidebar-overlay" hidden aria-hidden="true"></div>
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-book-bookmark"></i>
+                    <span>KhataPro</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-link active" data-view="dashboard">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-link" data-view="khata">
+                    <i class="fas fa-users"></i>
+                    <span>Khata Book</span>
+                </a>
+                <a href="#" class="nav-link" data-view="rooznamcha">
+                    <i class="fas fa-book"></i>
+                    <span>Daily Book</span>
+                </a>
+                <a href="#" class="nav-link" data-view="reports">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="#" class="nav-link" data-view="trash">
+                    <i class="fas fa-trash-alt"></i>
+                    <span>Trash</span>
+                </a>
+                <a href="#" class="nav-link" data-view="settings">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                    <button id="btn-global-undo" class="btn btn-icon" title="Undo (Ctrl+Z)" disabled>
+                        <i class="fas fa-undo"></i>
+                    </button>
+                    <button id="btn-global-redo" class="btn btn-icon" title="Redo (Ctrl+Y)" disabled>
+                        <i class="fas fa-redo"></i>
+                    </button>
+                </div>
+                <div id="backup-indicator-mini" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem; background: rgba(0,0,0,0.1); border-radius: 8px; font-size: 0.75rem; color: var(--text-muted);">
+                    <i class="fas fa-cloud"></i>
+                    <span id="backup-indicator-text">Backup: Not Set</span>
+                </div>
+                <button id="theme-toggle" class="btn-icon">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <div class="profile-mini">
+                    <div class="avatar" id="profile-avatar">KP</div>
+                    <div class="info">
+                        <span class="name" id="profile-name">My Business</span>
+                        <span class="status">Online</span>
+                    </div>
+                </div>
+                <span class="app-version" id="app-version">v1.0.0</span>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-bar">
+                <button type="button" id="btn-mobile-menu" class="btn-icon mobile-only" aria-label="Open menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="search-bar">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search transactions, customers...">
+                </div>
+                <div class="top-actions"></div>
+            </header>
+
+            <div id="web-mode-banner" class="web-mode-banner" hidden>
+                <div class="web-mode-banner-text">
+                    <i class="fas fa-globe"></i>
+                    <span><strong>Web version:</strong> Use Chrome or Edge for folder auto-backup, or install the desktop app for the best experience.</span>
+                </div>
+                <div class="web-mode-banner-actions">
+                    <a href="#" id="link-desktop-app" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer" hidden>Get Desktop App</a>
+                    <button type="button" id="btn-dismiss-web-banner" class="btn-icon" aria-label="Dismiss">&times;</button>
+                </div>
+            </div>
+
+            <div id="view-container" class="view-content fade-in">
+                <!-- Dashboard View (Default) -->
+                <section id="dashboard-view" class="view active">
+                    <div class="view-header">
+                        <div class="header-main">
+                            <h2>Dashboard</h2>
+                            <p>Overview of your business performance</p>
+                        </div>
+                        <div class="header-actions">
+                            <button class="btn btn-primary btn-add-transaction">
+                                <i class="fas fa-plus"></i>
+                                <span>New Entry</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card primary">
+                            <div class="stat-header">
+                                <div class="stat-icon"><i class="fas fa-wallet"></i></div>
+                                <span class="trend up" id="cash-trend" hidden><i class="fas fa-arrow-up"></i> <span id="cash-trend-value">0%</span></span>
+                            </div>
+                            <div class="stat-info">
+                                <span class="label">Cash in Hand</span>
+                                <h3 id="total-cash">0.00</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="stat-header">
+                                <div class="stat-icon"><i class="fas fa-hand-holding-dollar"></i></div>
+                                <span class="trend neutral">Khata</span>
+                            </div>
+                            <div class="stat-info">
+                                <span class="label">Total Receivables</span>
+                                <h3 id="total-receivables">0.00</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card danger">
+                            <div class="stat-header">
+                                <div class="stat-icon"><i class="fas fa-money-bill-transfer"></i></div>
+                                <span class="trend neutral">Payables</span>
+                            </div>
+                            <div class="stat-info">
+                                <span class="label">Total Payables</span>
+                                <h3 id="total-payables">0.00</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card warning">
+                            <div class="stat-header">
+                                <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                                <span class="trend neutral">Daily</span>
+                            </div>
+                            <div class="stat-info">
+                                <span class="label">Today's Net</span>
+                                <h3 id="total-net-today">0.00</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid-new">
+                        <div class="content-card chart-container">
+                            <div class="card-header">
+                                <h3>Weekly Cash Flow</h3>
+                                <div class="card-actions">
+                                    <span class="badge income">Income</span>
+                                    <span class="badge expense">Expense</span>
+                                </div>
+                            </div>
+                            <div class="chart-wrapper">
+                                <canvas id="cashflow-chart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="content-card distribution-container">
+                            <div class="card-header">
+                                <h3>Account Distribution</h3>
+                            </div>
+                            <div class="chart-wrapper-small">
+                                <canvas id="distribution-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid" style="margin-top: 1.5rem;">
+                        <div class="grid-main">
+                            <div class="content-card recent-transactions">
+                                <div class="card-header">
+                                    <h3>Recent Rooznamcha Entries</h3>
+                                    <button class="btn-text" onclick="document.querySelector('[data-view=\'rooznamcha\']').click()">View All</button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Description</th>
+                                                <th>Category</th>
+                                                <th>Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="recent-transactions-list">
+                                            <tr>
+                                                <td colspan="4" class="text-center">No recent transactions</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid-side">
+                            <div class="content-card customer-summary">
+                                <div class="card-header">
+                                    <h3>Top Khata Accounts</h3>
+                                    <button class="btn-text" onclick="document.querySelector('[data-view=\'khata\']').click()">Manage</button>
+                                </div>
+                                <div class="customer-list-mini" id="top-customers-list">
+                                    <p class="empty-state">No customers added yet.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Other views will be rendered here dynamically or kept hidden -->
+                <section id="khata-view" class="view">
+                    <div class="view-header">
+                        <div class="header-main">
+                            <h2>Khata Management</h2>
+                            <p>Manage your customer credit and payments.</p>
+                        </div>
+                        <button class="btn btn-primary btn-add-customer">
+                            <i class="fas fa-user-plus"></i>
+                            <span>Add Customer</span>
+                        </button>
+                    </div>
+
+                    <div class="content-card">
+                        <div class="card-header">
+                            <h3>All Customers</h3>
+                            <div class="filter-group">
+                                <input type="text" id="customer-search" placeholder="Search by name or phone...">
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Khata No</th>
+                                        <th>Name</th>
+                                        <th>Phone</th>
+                                        <th>Last Transaction</th>
+                                        <th>Current Balance</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="customers-list">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="rooznamcha-view" class="view">
+                    <div class="view-header">
+                        <div class="header-main">
+                            <h2>Daily Book (Rooznamcha)</h2>
+                            <p>Record all daily cash income and expenses.</p>
+                        </div>
+                        <div class="header-actions no-print">
+                            <button class="btn btn-secondary" id="btn-print-rooznamcha">
+                                <i class="fas fa-print"></i>
+                                <span>Print Daily Report</span>
+                            </button>
+                            <button class="btn btn-success btn-add-income">
+                                <i class="fas fa-plus"></i>
+                                <span>Add Income</span>
+                            </button>
+                            <button class="btn btn-danger btn-add-expense">
+                                <i class="fas fa-plus"></i>
+                                <span>Add Expense</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="daily-summary-bar no-print">
+                        <div class="day-stat income">
+                            <span class="label">Today's Total Income</span>
+                            <span class="value" id="today-income">Rs. 0</span>
+                        </div>
+                        <div class="day-stat expense">
+                            <span class="label">Today's Total Out</span>
+                            <span class="value" id="today-expense">Rs. 0</span>
+                        </div>
+                        <div class="day-stat net">
+                            <span class="label">Today's Net Balance</span>
+                            <span class="value" id="today-net">Rs. 0</span>
+                        </div>
+                    </div>
+
+                    <div class="content-card">
+                        <div class="card-header">
+                            <h3>Transaction History</h3>
+                            <div class="filter-group">
+                                <input type="date" id="rooznamcha-date-filter">
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Description</th>
+                                        <th>Category</th>
+                                        <th>Amount</th>
+                                        <th>Type</th>
+                                        <th class="no-print">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rooznamcha-list">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="reports-view" class="view">
+                    <div class="view-header">
+                        <div class="header-main">
+                            <h2>Business Reports</h2>
+                            <p>Generate summaries and data backup.</p>
+                        </div>
+                        <div class="top-actions no-print">
+                            <button class="btn btn-secondary" id="btn-export-csv">
+                                <i class="fas fa-file-csv"></i> Export to Excel
+                            </button>
+                            <button class="btn btn-secondary" id="btn-export-data">
+                                <i class="fas fa-file-export"></i> Export Backup
+                            </button>
+                            <button class="btn btn-secondary" id="btn-import-data">
+                                <i class="fas fa-file-import"></i> Import Backup
+                            </button>
+                            <input type="file" id="import-file-input" style="display: none;" accept=".json">
+                            <button class="btn btn-primary" onclick="window.print()">
+                                <i class="fas fa-print"></i> Print Full Report
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="reports-grid">
+                        <div class="content-card printable-area">
+                            <div class="card-header">
+                                <h3>Account Summary</h3>
+                            </div>
+                            <div class="report-summary-stats">
+                                <div class="report-stat">
+                                    <span class="label">Total receivables from Customers</span>
+                                    <span class="value text-success" id="report-rec">—</span>
+                                </div>
+                                <div class="report-stat">
+                                    <span class="label">Total payables to Customers</span>
+                                    <span class="value text-danger" id="report-pay">—</span>
+                                </div>
+                                <div class="report-stat">
+                                    <span class="label">Net Cash in Hand</span>
+                                    <span class="value" id="report-cash">—</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="content-card no-print">
+                            <div class="card-header">
+                                <h3>Quick Actions</h3>
+                            </div>
+                            <div class="reports-actions">
+                                <p>Select a date range to filter your daily book summaries.</p>
+                                <div class="filter-group" style="margin-top: 1rem;">
+                                    <input type="date" id="report-start-date">
+                                    <span>to</span>
+                                    <input type="date" id="report-end-date">
+                                </div>
+                                <button type="button" class="btn btn-secondary" id="btn-generate-filtered-report" style="margin-top: 1rem; width: 100%;">Generate Filtered Report</button>
+                                <div id="report-filtered-summary" class="report-filtered-summary" hidden>
+                                    <div class="report-stat">
+                                        <span class="label">Cash In (selected period)</span>
+                                        <span class="value text-success" id="report-filter-income">—</span>
+                                    </div>
+                                    <div class="report-stat">
+                                        <span class="label">Cash Out (selected period)</span>
+                                        <span class="value text-danger" id="report-filter-expense">—</span>
+                                    </div>
+                                    <div class="report-stat">
+                                        <span class="label">Net for period</span>
+                                        <span class="value" id="report-filter-net">—</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="trash-view" class="view">
+                    <div class="view-header">
+                        <div class="header-main">
+                            <h2>Trash / Deleted Items</h2>
+                            <p>Restore deleted transactions or customers</p>
+                        </div>
+                        <button class="btn btn-danger" id="btn-empty-trash">
+                            <i class="fas fa-trash-restore"></i> Empty Trash
+                        </button>
+                    </div>
+                    <div class="content-card">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Details</th>
+                                        <th>Deleted Date</th>
+                                        <th class="text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trash-list">
+                                    <!-- Dynamic trash items -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="settings-view" class="view">
+                    <div class="view-header">
+                        <div class="header-main">
+                            <h2>Settings</h2>
+                            <p>Configure your shop details and preferences.</p>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        <div class="content-card">
+                            <div class="card-header">
+                                <h3>Shop Details</h3>
+                            </div>
+                            <form id="settings-form">
+                                <div class="form-group">
+                                    <label>Shop Name</label>
+                                    <input type="text" id="setting-shop-name" placeholder="Enter shop name">
+                                </div>
+                                <div class="form-group">
+                                    <label>Currency Symbol</label>
+                                    <input type="text" id="setting-currency" placeholder="e.g. Rs., $, AED">
+                                </div>
+                                <div class="form-group">
+                                    <label>Language</label>
+                                    <select id="setting-language">
+                                        <option value="en">English</option>
+                                        <option value="ur">Urdu (اردو)</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Save Settings</button>
+                            </form>
+                        </div>
+
+                        <div class="content-card">
+                            <div class="card-header">
+                                <h3>Cloud Synchronization</h3>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                <div class="form-group highlight">
+                                    <label>Google Drive Sync</label>
+                                    <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 0.75rem;">Sync your data across multiple devices using your Google account.</p>
+                                    
+                                    <div id="gdrive-sync-status" style="margin-bottom: 1rem; padding: 0.75rem; border-radius: var(--radius-md); background: var(--bg-main); border: 1px solid var(--border); display: none;">
+                                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                            <i class="fab fa-google-drive" style="color: #34a853; font-size: 1.2rem;"></i>
+                                            <div>
+                                                <div id="gdrive-user-email" style="font-weight: 600; font-size: 0.9rem;">Not Connected</div>
+                                                <div id="gdrive-last-sync" style="font-size: 0.75rem; color: var(--text-muted);">Last sync: Never</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button class="btn btn-secondary" id="btn-gdrive-connect" style="width: 100%; justify-content: center;">
+                                        <i class="fab fa-google"></i> Connect Google Drive
+                                    </button>
+                                    
+                                    <div id="gdrive-actions" style="display: none; gap: 0.75rem; margin-top: 0.75rem;">
+                                        <button class="btn btn-success" id="btn-gdrive-sync-now" style="flex: 1; justify-content: center;">
+                                            <i class="fas fa-sync"></i> Sync Now
+                                        </button>
+                                        <button class="btn btn-danger" id="btn-gdrive-disconnect" style="width: 42px; padding: 0; justify-content: center;" title="Disconnect">
+                                            <i class="fas fa-sign-out-alt"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <hr style="border: 0; border-top: 1px solid var(--border); margin: 0.25rem 0;">
+
+                                <div class="form-group highlight">
+                                    <label>GitHub Cloud Backup</label>
+                                    <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 0.75rem;">
+                                        Save your Khata data to a <strong>private GitHub Gist</strong>. Create a token with <code>gist</code> scope at
+                                        <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a>.
+                                    </p>
+                                    <div class="form-group">
+                                        <label for="github-token-input">GitHub Token</label>
+                                        <input type="password" id="github-token-input" placeholder="ghp_xxxxxxxx" autocomplete="off">
+                                    </div>
+                                    <div id="github-sync-status" style="margin-bottom: 0.75rem; padding: 0.75rem; border-radius: var(--radius-md); background: var(--bg-main); border: 1px solid var(--border); font-size: 0.85rem; color: var(--text-muted);">
+                                        Status: Not connected
+                                    </div>
+                                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                        <button type="button" class="btn btn-secondary" id="btn-github-save-token" style="width: 100%; justify-content: center;">
+                                            <i class="fab fa-github"></i> Save Token & Connect
+                                        </button>
+                                        <button type="button" class="btn btn-success" id="btn-github-upload" style="width: 100%; justify-content: center;" disabled>
+                                            <i class="fas fa-cloud-upload-alt"></i> Upload Data to GitHub
+                                        </button>
+                                        <button type="button" class="btn btn-primary" id="btn-github-download" style="width: 100%; justify-content: center;" disabled>
+                                            <i class="fas fa-cloud-download-alt"></i> Restore Data from GitHub
+                                        </button>
+                                        <button type="button" class="btn btn-danger" id="btn-github-disconnect" style="width: 100%; justify-content: center;" disabled>
+                                            <i class="fas fa-unlink"></i> Disconnect GitHub
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="content-card">
+                            <div class="card-header">
+                                <h3>Data Management & Auto Backup</h3>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                <div class="form-group highlight">
+                                    <label>Auto Backup Folder (Every 1 min)</label>
+                                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                                        <div id="setting-backup-path-display" style="padding: 0.75rem; background-color: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); font-family: monospace; font-size: 0.85rem; word-break: break-all; min-height: 2.5rem; color: var(--text-main);">
+                                            No folder selected
+                                        </div>
+                                        <button class="btn btn-secondary" id="btn-select-backup-folder" style="width: 100%;">
+                                            <i class="fas fa-folder-open"></i> Select Backup Folder
+                                        </button>
+                                        <button class="btn btn-success" id="btn-backup-now" style="width: 100%;">
+                                            <i class="fas fa-sync"></i> Backup Data Now
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">
+                                        <span id="backup-status-text">Data is automatically saved every minute.</span>
+                                        <span id="backup-timer-text">Next backup in: 60s</span>
+                                    </div>
+                                </div>
+                                <hr style="border: 0; border-top: 1px solid var(--border); margin: 0.5rem 0;">
+                                <p class="text-muted" style="font-size: 0.9rem;">Resetting all data will permanently delete your records. This cannot be undone.</p>
+                                <button class="btn btn-danger" id="btn-reset-data">
+                                    <i class="fas fa-trash-alt"></i> Reset All Data
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-container" class="modal-overlay">
+        <div class="modal-card fade-in">
+            <div class="modal-header">
+                <h3 id="modal-title">New Entry</h3>
+                <button class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="main-form">
+                    <!-- Dynamic form based on action -->
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print Containers -->
+    <div id="ledger-print-container"></div>
+
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="site-config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

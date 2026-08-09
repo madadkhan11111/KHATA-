@@ -1,0 +1,42 @@
+{
+  "name": "khata-book-pro",
+  "version": "1.0.0",
+  "description": "Professional Khata Book and Rooznamcha software",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "web": "node server.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "author": "JD",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.khatapro.app",
+    "productName": "KhataBook Pro",
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "files": [
+      "index.html",
+      "app.js",
+      "site-config.js",
+      "style.css",
+      "manifest.json",
+      "favicon.svg",
+      "preload.js",
+      "main.js"
+    ]
+  }
+}
