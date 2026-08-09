@@ -1512,6 +1512,21 @@ body.rtl .form-row {
     display: none !important;
 }
 
+[hidden] {
+    display: none !important;
+}
+
+.btn-google {
+    background: #fff;
+    color: #1f2937;
+    border: 1px solid #e5e7eb;
+    justify-content: center;
+}
+
+.btn-google:hover {
+    background: #f8fafc;
+}
+
 @keyframes rise-in {
     from {
         opacity: 0;

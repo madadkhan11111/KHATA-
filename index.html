@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=1.1.1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -47,14 +47,14 @@
             <button type="button" class="btn btn-primary" id="btn-auth-login" style="width:100%; justify-content:center;">
                 <i class="fas fa-sign-in-alt"></i> Log In
             </button>
-            <button type="button" class="btn btn-primary" id="btn-auth-signup" style="width:100%; justify-content:center;" hidden>
+            <button type="button" class="btn btn-primary" id="btn-auth-signup" style="width:100%; justify-content:center; display:none;">
                 <i class="fas fa-user-plus"></i> Create Account
             </button>
-            <button type="button" class="btn btn-secondary" id="btn-auth-google" style="width:100%; justify-content:center; margin-top:0.75rem;">
+            <button type="button" class="btn btn-google" id="btn-auth-google" style="width:100%; justify-content:center; margin-top:0.75rem;">
                 <i class="fab fa-google"></i> Continue with Google
             </button>
             <p class="auth-switch" id="auth-switch-signup">New here? <a href="#" id="link-show-signup">Create a free account</a></p>
-            <p class="auth-switch" id="auth-switch-login" hidden>Already have an account? <a href="#" id="link-show-login">Log in</a></p>
+            <p class="auth-switch" id="auth-switch-login" style="display:none;">Already have an account? <a href="#" id="link-show-login">Log in</a></p>
         </div>
     </div>
 

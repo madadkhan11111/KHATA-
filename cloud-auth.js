@@ -79,12 +79,24 @@ const AccountCloud = {
         if (sub) {
             sub.textContent = isSignup
                 ? 'Sign up free — your Khata data syncs privately to Firebase.'
-                : 'Log in to open your Khata book from any device.';
+                : 'Log in — your Khata data syncs privately to Firebase Cloud.';
         }
-        if (loginBtn) loginBtn.hidden = isSignup;
-        if (signupBtn) signupBtn.hidden = !isSignup;
-        if (switchLogin) switchLogin.hidden = !isSignup;
-        if (switchSignup) switchSignup.hidden = isSignup;
+        if (loginBtn) {
+            loginBtn.hidden = isSignup;
+            loginBtn.style.display = isSignup ? 'none' : 'inline-flex';
+        }
+        if (signupBtn) {
+            signupBtn.hidden = !isSignup;
+            signupBtn.style.display = isSignup ? 'inline-flex' : 'none';
+        }
+        if (switchLogin) {
+            switchLogin.hidden = !isSignup;
+            switchLogin.style.display = isSignup ? 'block' : 'none';
+        }
+        if (switchSignup) {
+            switchSignup.hidden = isSignup;
+            switchSignup.style.display = isSignup ? 'none' : 'block';
+        }
         this.setAuthMessage('');
     },
 
