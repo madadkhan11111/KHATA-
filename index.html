@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.1.1">
+    <link rel="stylesheet" href="style.css?v=1.2.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -31,30 +31,41 @@
     </noscript>
 
     <div id="auth-screen" class="auth-screen">
-        <div class="auth-card" id="auth-card">
-            <div class="auth-brand"><i class="fas fa-book-bookmark"></i><span>KhataPro</span></div>
-            <h1 id="auth-title">Welcome back</h1>
-            <p class="auth-sub" id="auth-subtitle">Log in — your Khata data syncs privately to Firebase Cloud.</p>
-            <div class="form-group">
-                <label for="auth-email">Email</label>
-                <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="username">
+        <div class="auth-backdrop" aria-hidden="true"></div>
+        <div class="auth-shell">
+            <div class="auth-hero">
+                <p class="auth-kicker">Cloud Khata Book</p>
+                <div class="auth-brand" id="auth-brand-mark">
+                    <span class="auth-mark"><i class="fas fa-book-bookmark"></i></span>
+                    <span class="auth-name">KhataPro</span>
+                </div>
+                <p class="auth-tagline">Your shop ledger, synced privately — anywhere.</p>
             </div>
-            <div class="form-group">
-                <label for="auth-password">Password</label>
-                <input type="password" id="auth-password" placeholder="Min 6 characters" autocomplete="current-password">
+            <div class="auth-card" id="auth-card">
+                <h1 id="auth-title">Welcome back</h1>
+                <p class="auth-sub" id="auth-subtitle">Log in to open your book on this device.</p>
+                <div class="form-group">
+                    <label for="auth-email">Email</label>
+                    <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="auth-password">Password</label>
+                    <input type="password" id="auth-password" placeholder="Min 6 characters" autocomplete="current-password">
+                </div>
+                <p id="auth-message" class="auth-message" role="status"></p>
+                <button type="button" class="btn btn-primary auth-btn" id="btn-auth-login">
+                    <i class="fas fa-sign-in-alt"></i> Log In
+                </button>
+                <button type="button" class="btn btn-primary auth-btn" id="btn-auth-signup" style="display:none;">
+                    <i class="fas fa-user-plus"></i> Create Account
+                </button>
+                <div class="auth-divider"><span>or</span></div>
+                <button type="button" class="btn btn-google auth-btn" id="btn-auth-google">
+                    <i class="fab fa-google"></i> Continue with Google
+                </button>
+                <p class="auth-switch" id="auth-switch-signup">New here? <a href="#" id="link-show-signup">Create a free account</a></p>
+                <p class="auth-switch" id="auth-switch-login" style="display:none;">Already have an account? <a href="#" id="link-show-login">Log in</a></p>
             </div>
-            <p id="auth-message" class="auth-message"></p>
-            <button type="button" class="btn btn-primary" id="btn-auth-login" style="width:100%; justify-content:center;">
-                <i class="fas fa-sign-in-alt"></i> Log In
-            </button>
-            <button type="button" class="btn btn-primary" id="btn-auth-signup" style="width:100%; justify-content:center; display:none;">
-                <i class="fas fa-user-plus"></i> Create Account
-            </button>
-            <button type="button" class="btn btn-google" id="btn-auth-google" style="width:100%; justify-content:center; margin-top:0.75rem;">
-                <i class="fab fa-google"></i> Continue with Google
-            </button>
-            <p class="auth-switch" id="auth-switch-signup">New here? <a href="#" id="link-show-signup">Create a free account</a></p>
-            <p class="auth-switch" id="auth-switch-login" style="display:none;">Already have an account? <a href="#" id="link-show-login">Log in</a></p>
         </div>
     </div>
 
@@ -538,8 +549,8 @@
     <!-- Print Containers -->
     <div id="ledger-print-container"></div>
 
-    <script src="site-config.js?v=1.1.1"></script>
-    <script src="cloud-auth.js?v=1.1.1"></script>
-    <script src="app.js?v=1.1.1"></script>
+    <script src="site-config.js?v=1.2.0"></script>
+    <script src="cloud-auth.js?v=1.2.0"></script>
+    <script src="app.js?v=1.2.0"></script>
 </body>
 </html>

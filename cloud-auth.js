@@ -78,8 +78,8 @@ const AccountCloud = {
         if (title) title.textContent = isSignup ? 'Create your account' : 'Welcome back';
         if (sub) {
             sub.textContent = isSignup
-                ? 'Sign up free — your Khata data syncs privately to Firebase.'
-                : 'Log in — your Khata data syncs privately to Firebase Cloud.';
+                ? 'Create a free account — your book syncs privately.'
+                : 'Log in to open your book on this device.';
         }
         if (loginBtn) {
             loginBtn.hidden = isSignup;
@@ -108,20 +108,19 @@ const AccountCloud = {
         const box = document.getElementById('auth-card');
         if (!box) return;
         box.innerHTML = `
-            <div class="auth-brand"><i class="fas fa-book-bookmark"></i><span>KhataPro</span></div>
             <h1>Connect Firebase</h1>
-            <p class="auth-sub">Your app data needs a free Firebase project (2 minutes). Website stays on GitHub/Vercel.</p>
+            <p class="auth-sub">Your app data needs a free Firebase project (2 minutes).</p>
             <ol class="auth-steps">
                 <li>Open <a href="https://console.firebase.google.com/" target="_blank" rel="noopener">Firebase Console</a></li>
                 <li>Create a project (or open an existing one)</li>
                 <li><strong>Authentication</strong> → Sign-in method → enable <strong>Email/Password</strong> and <strong>Google</strong></li>
                 <li><strong>Firestore Database</strong> → Create database</li>
                 <li>Paste security rules from the file <code>firestore.rules</code></li>
-                <li>Project settings ⚙️ → Your apps → Web app → copy the <code>firebaseConfig</code></li>
+                <li>Project settings → Your apps → Web app → copy the <code>firebaseConfig</code></li>
                 <li>Paste that config into <code>site-config.js</code></li>
-                <li>Authentication → Settings → Authorized domains → add <code>madadkhan11111.github.io</code> (and your Vercel domain)</li>
+                <li>Authentication → Settings → Authorized domains → add <code>madadkhan11111.github.io</code></li>
             </ol>
-            <p class="auth-sub">Then tell Cursor <strong>“firebase config ready”</strong> or refresh after saving <code>site-config.js</code>.</p>
+            <p class="auth-sub">Then refresh after saving <code>site-config.js</code>.</p>
         `;
     },
 
