@@ -55,6 +55,7 @@ const AccountCloud = {
         document.getElementById('btn-auth-signup')?.addEventListener('click', () => this.signupEmail());
         document.getElementById('btn-auth-google')?.addEventListener('click', () => this.loginGoogle());
         document.getElementById('btn-auth-logout')?.addEventListener('click', () => this.logout());
+        document.getElementById('btn-auth-logout-side')?.addEventListener('click', () => this.logout());
         document.getElementById('btn-cloud-sync-now')?.addEventListener('click', () => this.syncNow(true));
         document.getElementById('link-show-signup')?.addEventListener('click', (e) => {
             e.preventDefault();

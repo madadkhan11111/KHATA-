@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>KhataBook Pro - Premium Ledger & Daily Cash Book</title>
     <meta name="description" content="Professional Khata Book and Rooznamcha with free cloud accounts for shops worldwide.">
-    <meta name="theme-color" content="#6366f1">
+    <meta name="theme-color" content="#0d7377">
     <meta name="application-version" content="1.1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="KhataPro">
@@ -17,7 +17,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -95,21 +95,21 @@
                 </a>
             </nav>
             <div class="sidebar-footer">
-                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <div class="sidebar-tools">
                     <button id="btn-global-undo" class="btn btn-icon" title="Undo (Ctrl+Z)" disabled>
                         <i class="fas fa-undo"></i>
                     </button>
                     <button id="btn-global-redo" class="btn btn-icon" title="Redo (Ctrl+Y)" disabled>
                         <i class="fas fa-redo"></i>
                     </button>
+                    <button id="theme-toggle" class="btn btn-icon" title="Toggle theme">
+                        <i class="fas fa-moon"></i>
+                    </button>
                 </div>
-                <div id="backup-indicator-mini" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem; background: rgba(0,0,0,0.1); border-radius: 8px; font-size: 0.75rem; color: var(--text-muted);">
+                <div id="backup-indicator-mini" class="cloud-pill">
                     <i class="fas fa-cloud"></i>
                     <span id="backup-indicator-text">Cloud: Sign in</span>
                 </div>
-                <button id="theme-toggle" class="btn-icon">
-                    <i class="fas fa-moon"></i>
-                </button>
                 <div class="profile-mini">
                     <div class="avatar" id="profile-avatar">KP</div>
                     <div class="info">
@@ -117,7 +117,7 @@
                         <span class="status">Online</span>
                     </div>
                 </div>
-                <button type="button" class="btn btn-secondary" id="btn-auth-logout" style="width:100%; justify-content:center; margin-top:0.5rem;">
+                <button type="button" class="btn btn-logout" id="btn-auth-logout-side">
                     <i class="fas fa-sign-out-alt"></i> Log Out
                 </button>
                 <span class="app-version" id="app-version">v1.0.0</span>
@@ -134,7 +134,12 @@
                     <i class="fas fa-search"></i>
                     <input type="text" placeholder="Search transactions, customers...">
                 </div>
-                <div class="top-actions"></div>
+                <div class="top-actions">
+                    <button type="button" class="btn btn-logout" id="btn-auth-logout" title="Log out of your account">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Log Out</span>
+                    </button>
+                </div>
             </header>
 
             <div id="view-container" class="view-content fade-in">
