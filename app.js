@@ -36,38 +36,12 @@ const translations = {
 };
 
 /**
- * Browser Folder Handle Persistence (IndexedDB)
+ * Unused folder-handle helpers (manual backup removed).
  */
 const HandleStore = {
-    dbName: 'KhataBackupDB',
-    storeName: 'handles',
-    async getDB() {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(this.dbName, 1);
-            request.onupgradeneeded = () => request.result.createObjectStore(this.storeName);
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-    },
-    async save(handle) {
-        const db = await this.getDB();
-        const tx = db.transaction(this.storeName, 'readwrite');
-        tx.objectStore(this.storeName).put(handle, 'backupFolder');
-        return new Promise((resolve) => tx.oncomplete = () => resolve());
-    },
-    async get() {
-        try {
-            const db = await this.getDB();
-            const tx = db.transaction(this.storeName, 'readonly');
-            const request = tx.objectStore(this.storeName).get('backupFolder');
-            return new Promise((resolve) => request.onsuccess = () => resolve(request.result));
-        } catch (e) { return null; }
-    }
+    async save() {},
+    async get() { return null; }
 };
-
-/**
- * Google Drive Sync Manager
- */
 
 class DataManager {
     constructor() {
