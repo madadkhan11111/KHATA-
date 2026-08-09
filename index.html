@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.3.0">
+    <link rel="stylesheet" href="style.css?v=1.4.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -81,28 +81,28 @@
             </div>
             <nav class="sidebar-nav">
                 <a href="#" class="nav-link active" data-view="dashboard">
-                    <i class="fas fa-chart-pie"></i>
-                    <span>Dashboard</span>
+                    <i class="fas fa-home"></i>
+                    <span>Home<br><small>گھر</small></span>
                 </a>
                 <a href="#" class="nav-link" data-view="khata">
                     <i class="fas fa-users"></i>
-                    <span>Khata Book</span>
+                    <span>Customers<br><small>کھاتہ</small></span>
                 </a>
                 <a href="#" class="nav-link" data-view="rooznamcha">
                     <i class="fas fa-book"></i>
-                    <span>Daily Book</span>
+                    <span>Daily Book<br><small>روزناملہ</small></span>
                 </a>
                 <a href="#" class="nav-link" data-view="reports">
                     <i class="fas fa-file-invoice-dollar"></i>
-                    <span>Reports</span>
+                    <span>Reports<br><small>رپورٹ</small></span>
                 </a>
                 <a href="#" class="nav-link" data-view="trash">
                     <i class="fas fa-trash-alt"></i>
-                    <span>Trash</span>
+                    <span>Trash<br><small>کچرا</small></span>
                 </a>
                 <a href="#" class="nav-link" data-view="settings">
                     <i class="fas fa-cog"></i>
-                    <span>Settings</span>
+                    <span>Settings<br><small>سیٹنگ</small></span>
                 </a>
             </nav>
             <div class="sidebar-footer">
@@ -156,138 +156,152 @@
             <div id="view-container" class="view-content fade-in">
                 <!-- Dashboard View (Default) -->
                 <section id="dashboard-view" class="view active">
-                    <div class="view-header">
+                    <div class="view-header home-header">
                         <div class="header-main">
-                            <p class="view-eyebrow">Your cloud ledger</p>
-                            <h2>Dashboard</h2>
-                            <p>Cash, khata, and daily book — saved for you after every change.</p>
-                        </div>
-                        <div class="header-actions">
-                            <button class="btn btn-primary btn-add-transaction">
-                                <i class="fas fa-plus"></i>
-                                <span>New Entry</span>
-                            </button>
+                            <p class="view-eyebrow">Assalam o Alaikum</p>
+                            <h2>آسان کھاتہ</h2>
+                            <p>بڑے بٹن دبائیں — سب کچھ آسان ہے۔ Big buttons. Simple work.</p>
                         </div>
                     </div>
 
-                    <div class="stats-grid">
+                    <div class="quick-actions">
+                        <button type="button" class="quick-card accent btn-add-customer">
+                            <i class="fas fa-user-plus"></i>
+                            <strong>Add Customer</strong>
+                            <span>نیا گاہک شامل کریں</span>
+                        </button>
+                        <button type="button" class="quick-card primary btn-add-transaction">
+                            <i class="fas fa-plus-circle"></i>
+                            <strong>New Entry</strong>
+                            <span>نیا اندراج / روزنامچہ</span>
+                        </button>
+                        <button type="button" class="quick-card" data-go-view="khata">
+                            <i class="fas fa-address-book"></i>
+                            <strong>All Customers</strong>
+                            <span>تمام کھاتے دیکھیں</span>
+                        </button>
+                        <button type="button" class="quick-card" data-go-view="rooznamcha">
+                            <i class="fas fa-calendar-day"></i>
+                            <strong>Daily Book</strong>
+                            <span>آج کا روزنامچہ</span>
+                        </button>
+                    </div>
+
+                    <div class="stats-grid simple-stats">
                         <div class="stat-card primary">
                             <div class="stat-header">
                                 <div class="stat-icon"><i class="fas fa-wallet"></i></div>
-                                <span class="trend up" id="cash-trend" hidden><i class="fas fa-arrow-up"></i> <span id="cash-trend-value">0%</span></span>
                             </div>
                             <div class="stat-info">
-                                <span class="label">Cash in Hand</span>
+                                <span class="label">نقدی / Cash</span>
                                 <h3 id="total-cash">0.00</h3>
                             </div>
                         </div>
                         <div class="stat-card success">
                             <div class="stat-header">
                                 <div class="stat-icon"><i class="fas fa-hand-holding-dollar"></i></div>
-                                <span class="trend neutral">Khata</span>
                             </div>
                             <div class="stat-info">
-                                <span class="label">Total Receivables</span>
+                                <span class="label">لینے ہیں / Receivable</span>
                                 <h3 id="total-receivables">0.00</h3>
                             </div>
                         </div>
                         <div class="stat-card danger">
                             <div class="stat-header">
                                 <div class="stat-icon"><i class="fas fa-money-bill-transfer"></i></div>
-                                <span class="trend neutral">Payables</span>
                             </div>
                             <div class="stat-info">
-                                <span class="label">Total Payables</span>
+                                <span class="label">دینے ہیں / Payable</span>
                                 <h3 id="total-payables">0.00</h3>
                             </div>
                         </div>
                         <div class="stat-card warning">
                             <div class="stat-header">
                                 <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
-                                <span class="trend neutral">Daily</span>
                             </div>
                             <div class="stat-info">
-                                <span class="label">Today's Net</span>
+                                <span class="label">آج / Today</span>
                                 <h3 id="total-net-today">0.00</h3>
                             </div>
                         </div>
                     </div>
 
-                    <div class="dashboard-grid-new">
-                        <div class="content-card chart-container">
-                            <div class="card-header">
-                                <h3>Weekly Cash Flow</h3>
-                                <div class="card-actions">
-                                    <span class="badge income">Income</span>
-                                    <span class="badge expense">Expense</span>
-                                </div>
-                            </div>
-                            <div class="chart-wrapper">
-                                <canvas id="cashflow-chart"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="content-card distribution-container">
-                            <div class="card-header">
-                                <h3>Account Distribution</h3>
-                            </div>
-                            <div class="chart-wrapper-small">
-                                <canvas id="distribution-chart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="dashboard-grid" style="margin-top: 1.5rem;">
-                        <div class="grid-main">
-                            <div class="content-card recent-transactions">
+                    <details class="more-panel">
+                        <summary>Charts &amp; recent activity — چارٹ دیکھیں</summary>
+                        <div class="dashboard-grid-new">
+                            <div class="content-card chart-container">
                                 <div class="card-header">
-                                    <h3>Recent Rooznamcha Entries</h3>
-                                    <button class="btn-text" onclick="document.querySelector('[data-view=\'rooznamcha\']').click()">View All</button>
+                                    <h3>Weekly Cash Flow</h3>
+                                    <div class="card-actions">
+                                        <span class="badge income">Income</span>
+                                        <span class="badge expense">Expense</span>
+                                    </div>
                                 </div>
-                                <div class="table-responsive">
-                                    <table class="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Date</th>
-                                                <th>Description</th>
-                                                <th>Category</th>
-                                                <th>Amount</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="recent-transactions-list">
-                                            <tr>
-                                                <td colspan="4" class="text-center">No recent transactions</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                                <div class="chart-wrapper">
+                                    <canvas id="cashflow-chart"></canvas>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="grid-side">
-                            <div class="content-card customer-summary">
+                            <div class="content-card distribution-container">
                                 <div class="card-header">
-                                    <h3>Top Khata Accounts</h3>
-                                    <button class="btn-text" onclick="document.querySelector('[data-view=\'khata\']').click()">Manage</button>
+                                    <h3>Account Distribution</h3>
                                 </div>
-                                <div class="customer-list-mini" id="top-customers-list">
-                                    <p class="empty-state">No customers added yet.</p>
+                                <div class="chart-wrapper-small">
+                                    <canvas id="distribution-chart"></canvas>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                        <div class="dashboard-grid" style="margin-top: 1.5rem;">
+                            <div class="grid-main">
+                                <div class="content-card recent-transactions">
+                                    <div class="card-header">
+                                        <h3>Recent Entries</h3>
+                                        <button type="button" class="btn-text" data-go-view="rooznamcha">View All</button>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Description</th>
+                                                    <th>Category</th>
+                                                    <th>Amount</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="recent-transactions-list">
+                                                <tr>
+                                                    <td colspan="4" class="text-center">No recent transactions</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="grid-side">
+                                <div class="content-card customer-summary">
+                                    <div class="card-header">
+                                        <h3>Top Customers</h3>
+                                        <button type="button" class="btn-text" data-go-view="khata">Open</button>
+                                    </div>
+                                    <div class="customer-list-mini" id="top-customers-list">
+                                        <p class="empty-state">No customers added yet.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
                 </section>
 
                 <!-- Other views will be rendered here dynamically or kept hidden -->
                 <section id="khata-view" class="view">
                     <div class="view-header">
                         <div class="header-main">
-                            <h2>Khata Management</h2>
-                            <p>Manage your customer credit and payments.</p>
+                            <p class="view-eyebrow">کھاتہ بک</p>
+                            <h2>Customers</h2>
+                            <p>گاہک شامل کریں، بیلنس دیکھیں، ادائیگی لیں</p>
                         </div>
-                        <button class="btn btn-primary btn-add-customer">
+                        <button class="btn btn-primary btn-add-customer btn-lg">
                             <i class="fas fa-user-plus"></i>
-                            <span>Add Customer</span>
+                            <span>Add Customer / نیا گاہک</span>
                         </button>
                     </div>
 
@@ -530,6 +544,24 @@
                 </section>
             </div>
         </main>
+
+        <nav class="mobile-bottom-nav" aria-label="Quick menu">
+            <button type="button" class="mob-nav-btn active" data-go-view="dashboard">
+                <i class="fas fa-home"></i><span>Home</span>
+            </button>
+            <button type="button" class="mob-nav-btn" data-go-view="khata">
+                <i class="fas fa-users"></i><span>Khata</span>
+            </button>
+            <button type="button" class="mob-nav-btn mob-nav-main btn-add-transaction">
+                <i class="fas fa-plus"></i><span>Entry</span>
+            </button>
+            <button type="button" class="mob-nav-btn" data-go-view="rooznamcha">
+                <i class="fas fa-book"></i><span>Daily</span>
+            </button>
+            <button type="button" class="mob-nav-btn btn-auth-logout-mob" id="btn-auth-logout-mob">
+                <i class="fas fa-sign-out-alt"></i><span>Out</span>
+            </button>
+        </nav>
     </div>
 
     <!-- Modals -->
@@ -550,8 +582,8 @@
     <!-- Print Containers -->
     <div id="ledger-print-container"></div>
 
-    <script src="site-config.js?v=1.3.0"></script>
-    <script src="cloud-auth.js?v=1.3.0"></script>
-    <script src="app.js?v=1.3.0"></script>
+    <script src="site-config.js?v=1.4.0"></script>
+    <script src="cloud-auth.js?v=1.4.0"></script>
+    <script src="app.js?v=1.4.0"></script>
 </body>
 </html>

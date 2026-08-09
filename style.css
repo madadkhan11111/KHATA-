@@ -1774,3 +1774,175 @@ body.rtl .form-row {
         font-size: 1.35rem;
     }
 }
+
+/* ===== Simple home / user-friendly UI ===== */
+.nav-link span {
+    line-height: 1.15;
+}
+.nav-link small {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 500;
+    opacity: 0.7;
+    margin-top: 0.1rem;
+}
+
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.quick-card {
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    border-radius: 18px;
+    padding: 1.25rem 1rem;
+    text-align: left;
+    cursor: pointer;
+    color: var(--text-main);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-height: 132px;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    font-family: var(--font-ui);
+}
+
+.quick-card i {
+    font-size: 1.45rem;
+    color: var(--primary);
+    margin-bottom: 0.35rem;
+}
+
+.quick-card strong {
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.quick-card span {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.quick-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+    border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.quick-card.primary {
+    background: linear-gradient(145deg, #0d7377, #14919b);
+    color: #fff;
+    border-color: transparent;
+}
+.quick-card.primary i,
+.quick-card.primary span { color: rgba(255,255,255,0.85); }
+
+.quick-card.accent {
+    background: linear-gradient(145deg, #9a7420, #c9a227);
+    color: #fff;
+    border-color: transparent;
+}
+.quick-card.accent i,
+.quick-card.accent span { color: rgba(255,255,255,0.88); }
+
+.home-header h2 {
+    font-size: clamp(1.9rem, 4vw, 2.5rem);
+}
+
+.simple-stats {
+    margin-bottom: 1.25rem;
+}
+
+.more-panel {
+    margin-top: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    padding: 0.85rem 1rem 1rem;
+}
+
+.more-panel summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 0.35rem 0.15rem 0.85rem;
+    list-style: none;
+}
+
+.more-panel summary::-webkit-details-marker { display: none; }
+.more-panel[open] summary { color: var(--primary); }
+
+.btn-lg {
+    padding: 0.95rem 1.35rem;
+    font-size: 1rem;
+    border-radius: 14px;
+}
+
+.mobile-bottom-nav {
+    display: none;
+}
+
+.app-container {
+    padding-bottom: 0;
+}
+
+@media (max-width: 1024px) {
+    .quick-actions {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .quick-actions {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+    }
+    .quick-card {
+        min-height: 118px;
+        padding: 1rem 0.85rem;
+    }
+    .main-content {
+        padding-bottom: 5.5rem;
+    }
+    .mobile-bottom-nav {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 120;
+        background: color-mix(in srgb, var(--bg-card) 92%, transparent);
+        backdrop-filter: blur(12px);
+        border-top: 1px solid var(--border);
+        padding: 0.35rem 0.25rem calc(0.35rem + env(safe-area-inset-bottom));
+    }
+    .mob-nav-btn {
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.2rem;
+        padding: 0.45rem 0.2rem;
+        font-size: 0.68rem;
+        font-family: var(--font-ui);
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .mob-nav-btn i { font-size: 1.05rem; }
+    .mob-nav-btn.active { color: var(--primary); }
+    .mob-nav-main {
+        color: #fff !important;
+        background: linear-gradient(145deg, #0d7377, #14919b);
+        border-radius: 14px;
+        margin-top: -0.55rem;
+        box-shadow: 0 8px 18px rgba(13,115,119,0.35);
+    }
+    .top-bar .btn-logout { display: none; }
+}
