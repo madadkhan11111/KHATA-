@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>KhataBook Pro - Premium Ledger & Daily Cash Book</title>
-    <meta name="description" content="Professional Khata Book and Rooznamcha software for modern business management. Track customers, daily cash book, reports, and auto-backup.">
+    <meta name="description" content="Professional Khata Book and Rooznamcha with free cloud accounts for shops worldwide.">
     <meta name="theme-color" content="#6366f1">
-    <meta name="application-version" content="1.0.0">
+    <meta name="application-version" content="1.1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="KhataPro">
     <meta property="og:title" content="KhataBook Pro - Ledger & Daily Cash Book">
-    <meta property="og:description" content="Professional Khata Book and Rooznamcha for shops and small businesses.">
+    <meta property="og:description" content="Create a free account and manage Khata & Rooznamcha from any device.">
     <meta property="og:type" content="website">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="icon.ico" type="image/x-icon">
@@ -21,12 +21,44 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 </head>
 <body class="dark-theme">
     <noscript>
         <p style="padding:2rem;text-align:center;font-family:sans-serif;">KhataBook Pro requires JavaScript. Please enable it in your browser.</p>
     </noscript>
-    <div class="app-container">
+
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-card" id="auth-card">
+            <div class="auth-brand"><i class="fas fa-book-bookmark"></i><span>KhataPro</span></div>
+            <h1 id="auth-title">Welcome back</h1>
+            <p class="auth-sub" id="auth-subtitle">Log in to open your Khata book from any device.</p>
+            <div class="form-group">
+                <label for="auth-email">Email</label>
+                <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label for="auth-password">Password</label>
+                <input type="password" id="auth-password" placeholder="Min 6 characters" autocomplete="current-password">
+            </div>
+            <p id="auth-message" class="auth-message"></p>
+            <button type="button" class="btn btn-primary" id="btn-auth-login" style="width:100%; justify-content:center;">
+                <i class="fas fa-sign-in-alt"></i> Log In
+            </button>
+            <button type="button" class="btn btn-primary" id="btn-auth-signup" style="width:100%; justify-content:center;" hidden>
+                <i class="fas fa-user-plus"></i> Create Account
+            </button>
+            <button type="button" class="btn btn-secondary" id="btn-auth-google" style="width:100%; justify-content:center; margin-top:0.75rem;">
+                <i class="fab fa-google"></i> Continue with Google
+            </button>
+            <p class="auth-switch" id="auth-switch-signup">New here? <a href="#" id="link-show-signup">Create a free account</a></p>
+            <p class="auth-switch" id="auth-switch-login" hidden>Already have an account? <a href="#" id="link-show-login">Log in</a></p>
+        </div>
+    </div>
+
+    <div class="app-container" hidden>
         <div id="sidebar-overlay" class="sidebar-overlay" hidden aria-hidden="true"></div>
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
@@ -73,7 +105,7 @@
                 </div>
                 <div id="backup-indicator-mini" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem; background: rgba(0,0,0,0.1); border-radius: 8px; font-size: 0.75rem; color: var(--text-muted);">
                     <i class="fas fa-cloud"></i>
-                    <span id="backup-indicator-text">Backup: Not Set</span>
+                    <span id="backup-indicator-text">Cloud: Sign in</span>
                 </div>
                 <button id="theme-toggle" class="btn-icon">
                     <i class="fas fa-moon"></i>
@@ -101,17 +133,6 @@
                 </div>
                 <div class="top-actions"></div>
             </header>
-
-            <div id="web-mode-banner" class="web-mode-banner" hidden>
-                <div class="web-mode-banner-text">
-                    <i class="fas fa-globe"></i>
-                    <span><strong>Web version:</strong> Use Chrome or Edge for folder auto-backup, or install the desktop app for the best experience.</span>
-                </div>
-                <div class="web-mode-banner-actions">
-                    <a href="#" id="link-desktop-app" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer" hidden>Get Desktop App</a>
-                    <button type="button" id="btn-dismiss-web-banner" class="btn-icon" aria-label="Dismiss">&times;</button>
-                </div>
-            </div>
 
             <div id="view-container" class="view-content fade-in">
                 <!-- Dashboard View (Default) -->
@@ -480,95 +501,31 @@
 
                         <div class="content-card">
                             <div class="card-header">
-                                <h3>Cloud Synchronization</h3>
+                                <h3>Your Cloud Account</h3>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 1rem;">
-                                <div class="form-group highlight">
-                                    <label>Google Drive Sync</label>
-                                    <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 0.75rem;">Sync your data across multiple devices using your Google account.</p>
-                                    
-                                    <div id="gdrive-sync-status" style="margin-bottom: 1rem; padding: 0.75rem; border-radius: var(--radius-md); background: var(--bg-main); border: 1px solid var(--border); display: none;">
-                                        <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                            <i class="fab fa-google-drive" style="color: #34a853; font-size: 1.2rem;"></i>
-                                            <div>
-                                                <div id="gdrive-user-email" style="font-weight: 600; font-size: 0.9rem;">Not Connected</div>
-                                                <div id="gdrive-last-sync" style="font-size: 0.75rem; color: var(--text-muted);">Last sync: Never</div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <button class="btn btn-secondary" id="btn-gdrive-connect" style="width: 100%; justify-content: center;">
-                                        <i class="fab fa-google"></i> Connect Google Drive
-                                    </button>
-                                    
-                                    <div id="gdrive-actions" style="display: none; gap: 0.75rem; margin-top: 0.75rem;">
-                                        <button class="btn btn-success" id="btn-gdrive-sync-now" style="flex: 1; justify-content: center;">
-                                            <i class="fas fa-sync"></i> Sync Now
-                                        </button>
-                                        <button class="btn btn-danger" id="btn-gdrive-disconnect" style="width: 42px; padding: 0; justify-content: center;" title="Disconnect">
-                                            <i class="fas fa-sign-out-alt"></i>
-                                        </button>
-                                    </div>
+                                <p class="text-muted" style="font-size: 0.9rem;">
+                                    Website is hosted on GitHub. Your Khata data is private to your account and syncs automatically to the cloud — no manual backup folder needed.
+                                </p>
+                                <div id="account-panel" style="padding: 0.75rem; border-radius: var(--radius-md); background: var(--bg-main); border: 1px solid var(--border);">
+                                    <div style="font-weight: 600;" id="account-user-email">Not signed in</div>
+                                    <div class="text-muted" style="font-size: 0.8rem; margin-top: 0.35rem;" id="account-sync-status">Sign in to sync.</div>
                                 </div>
-
-                                <hr style="border: 0; border-top: 1px solid var(--border); margin: 0.25rem 0;">
-
-                                <div class="form-group highlight">
-                                    <label>GitHub Cloud Backup</label>
-                                    <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 0.75rem;">
-                                        Save your Khata data to a <strong>private GitHub Gist</strong>. Create a token with <code>gist</code> scope at
-                                        <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a>.
-                                    </p>
-                                    <div class="form-group">
-                                        <label for="github-token-input">GitHub Token</label>
-                                        <input type="password" id="github-token-input" placeholder="ghp_xxxxxxxx" autocomplete="off">
-                                    </div>
-                                    <div id="github-sync-status" style="margin-bottom: 0.75rem; padding: 0.75rem; border-radius: var(--radius-md); background: var(--bg-main); border: 1px solid var(--border); font-size: 0.85rem; color: var(--text-muted);">
-                                        Status: Not connected
-                                    </div>
-                                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                                        <button type="button" class="btn btn-secondary" id="btn-github-save-token" style="width: 100%; justify-content: center;">
-                                            <i class="fab fa-github"></i> Save Token & Connect
-                                        </button>
-                                        <button type="button" class="btn btn-success" id="btn-github-upload" style="width: 100%; justify-content: center;" disabled>
-                                            <i class="fas fa-cloud-upload-alt"></i> Upload Data to GitHub
-                                        </button>
-                                        <button type="button" class="btn btn-primary" id="btn-github-download" style="width: 100%; justify-content: center;" disabled>
-                                            <i class="fas fa-cloud-download-alt"></i> Restore Data from GitHub
-                                        </button>
-                                        <button type="button" class="btn btn-danger" id="btn-github-disconnect" style="width: 100%; justify-content: center;" disabled>
-                                            <i class="fas fa-unlink"></i> Disconnect GitHub
-                                        </button>
-                                    </div>
-                                </div>
+                                <button type="button" class="btn btn-success" id="btn-cloud-sync-now" style="width: 100%; justify-content: center;">
+                                    <i class="fas fa-cloud-upload-alt"></i> Sync Now
+                                </button>
+                                <button type="button" class="btn btn-danger" id="btn-auth-logout" style="width: 100%; justify-content: center;">
+                                    <i class="fas fa-sign-out-alt"></i> Log Out
+                                </button>
                             </div>
                         </div>
 
                         <div class="content-card">
                             <div class="card-header">
-                                <h3>Data Management & Auto Backup</h3>
+                                <h3>Data Management</h3>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 1rem;">
-                                <div class="form-group highlight">
-                                    <label>Auto Backup Folder (Every 1 min)</label>
-                                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                                        <div id="setting-backup-path-display" style="padding: 0.75rem; background-color: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); font-family: monospace; font-size: 0.85rem; word-break: break-all; min-height: 2.5rem; color: var(--text-main);">
-                                            No folder selected
-                                        </div>
-                                        <button class="btn btn-secondary" id="btn-select-backup-folder" style="width: 100%;">
-                                            <i class="fas fa-folder-open"></i> Select Backup Folder
-                                        </button>
-                                        <button class="btn btn-success" id="btn-backup-now" style="width: 100%;">
-                                            <i class="fas fa-sync"></i> Backup Data Now
-                                        </button>
-                                    </div>
-                                    <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">
-                                        <span id="backup-status-text">Data is automatically saved every minute.</span>
-                                        <span id="backup-timer-text">Next backup in: 60s</span>
-                                    </div>
-                                </div>
-                                <hr style="border: 0; border-top: 1px solid var(--border); margin: 0.5rem 0;">
-                                <p class="text-muted" style="font-size: 0.9rem;">Resetting all data will permanently delete your records. This cannot be undone.</p>
+                                <p class="text-muted" style="font-size: 0.9rem;">Resetting all data will permanently delete your records from this account. This cannot be undone.</p>
                                 <button class="btn btn-danger" id="btn-reset-data">
                                     <i class="fas fa-trash-alt"></i> Reset All Data
                                 </button>
@@ -598,9 +555,8 @@
     <!-- Print Containers -->
     <div id="ledger-print-container"></div>
 
-    <script src="https://accounts.google.com/gsi/client"></script>
-    <script src="https://apis.google.com/js/api.js"></script>
     <script src="site-config.js"></script>
+    <script src="cloud-auth.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

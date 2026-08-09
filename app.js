@@ -1,4 +1,4 @@
-/**
+﻿/**
  * KhataPro App Logic
  */
 
@@ -19,19 +19,19 @@ const translations = {
         addExpense: 'Add Expense'
     },
     ur: {
-        dashboard: 'ڈیش بورڈ',
-        khata: 'کھاتہ بک',
-        rooznamcha: 'روزنامچہ',
-        reports: 'رپورٹس',
-        settings: 'سیٹنگز',
-        trash: 'ٹریش',
-        cashInHand: 'نقدی',
-        receivables: 'کل وصولی',
-        payables: 'کل ادائیگی',
-        newEntry: 'نیا اندراج',
-        addCustomer: 'گاہک شامل کریں',
-        addIncome: 'آمدنی شامل کریں',
-        addExpense: 'اخراجات شامل کریں'
+        dashboard: 'ÚˆÛŒØ´ Ø¨ÙˆØ±Úˆ',
+        khata: 'Ú©Ú¾Ø§ØªÛ Ø¨Ú©',
+        rooznamcha: 'Ø±ÙˆØ²Ù†Ø§Ù…Ú†Û',
+        reports: 'Ø±Ù¾ÙˆØ±Ù¹Ø³',
+        settings: 'Ø³ÛŒÙ¹Ù†Ú¯Ø²',
+        trash: 'Ù¹Ø±ÛŒØ´',
+        cashInHand: 'Ù†Ù‚Ø¯ÛŒ',
+        receivables: 'Ú©Ù„ ÙˆØµÙˆÙ„ÛŒ',
+        payables: 'Ú©Ù„ Ø§Ø¯Ø§Ø¦ÛŒÚ¯ÛŒ',
+        newEntry: 'Ù†ÛŒØ§ Ø§Ù†Ø¯Ø±Ø§Ø¬',
+        addCustomer: 'Ú¯Ø§ÛÚ© Ø´Ø§Ù…Ù„ Ú©Ø±ÛŒÚº',
+        addIncome: 'Ø¢Ù…Ø¯Ù†ÛŒ Ø´Ø§Ù…Ù„ Ú©Ø±ÛŒÚº',
+        addExpense: 'Ø§Ø®Ø±Ø§Ø¬Ø§Øª Ø´Ø§Ù…Ù„ Ú©Ø±ÛŒÚº'
     }
 };
 
@@ -68,428 +68,6 @@ const HandleStore = {
 /**
  * Google Drive Sync Manager
  */
-const GitHubCloudManager = {
-    TOKEN_KEY: 'khata-github-token',
-    GIST_KEY: 'khata-github-gist-id',
-    LAST_SYNC_KEY: 'khata-github-last-sync',
-    FILE_NAME: 'khata_cloud_backup.json',
-
-    get token() {
-        return localStorage.getItem(this.TOKEN_KEY) || '';
-    },
-
-    get gistId() {
-        return localStorage.getItem(this.GIST_KEY) || '';
-    },
-
-    init() {
-        const tokenInput = document.getElementById('github-token-input');
-        if (tokenInput && this.token) tokenInput.value = this.token;
-        this.updateUI();
-    },
-
-    updateUI() {
-        const status = document.getElementById('github-sync-status');
-        const uploadBtn = document.getElementById('btn-github-upload');
-        const downloadBtn = document.getElementById('btn-github-download');
-        const disconnectBtn = document.getElementById('btn-github-disconnect');
-        const connected = !!this.token;
-
-        if (uploadBtn) uploadBtn.disabled = !connected;
-        if (downloadBtn) downloadBtn.disabled = !connected;
-        if (disconnectBtn) disconnectBtn.disabled = !connected;
-
-        if (!status) return;
-        if (!connected) {
-            status.textContent = 'Status: Not connected';
-            return;
-        }
-        const last = localStorage.getItem(this.LAST_SYNC_KEY);
-        const gistPart = this.gistId ? `Gist: ${this.gistId.slice(0, 8)}…` : 'Gist: will create on first upload';
-        status.innerHTML = `Status: <strong style="color:var(--success)">Connected</strong> · ${gistPart}` +
-            (last ? `<br>Last sync: ${new Date(last).toLocaleString()}` : '');
-    },
-
-    saveToken(token) {
-        const clean = (token || '').trim();
-        if (!clean) {
-            showToast('Paste your GitHub token first.', 'error');
-            return false;
-        }
-        localStorage.setItem(this.TOKEN_KEY, clean);
-        this.updateUI();
-        showToast('GitHub token saved. You can upload/restore data now.', 'success');
-        return true;
-    },
-
-    disconnect() {
-        localStorage.removeItem(this.TOKEN_KEY);
-        localStorage.removeItem(this.GIST_KEY);
-        localStorage.removeItem(this.LAST_SYNC_KEY);
-        const tokenInput = document.getElementById('github-token-input');
-        if (tokenInput) tokenInput.value = '';
-        this.updateUI();
-        showToast('GitHub disconnected.', 'info');
-    },
-
-    exportPayload() {
-        // Never upload tokens/secrets into the cloud backup
-        const payload = JSON.parse(JSON.stringify(db.data));
-        return JSON.stringify(payload, null, 2);
-    },
-
-    async api(path, options = {}) {
-        const res = await fetch(`https://api.github.com${path}`, {
-            ...options,
-            headers: {
-                Accept: 'application/vnd.github+json',
-                Authorization: `Bearer ${this.token}`,
-                'X-GitHub-Api-Version': '2022-11-28',
-                'Content-Type': 'application/json',
-                ...(options.headers || {})
-            }
-        });
-        if (!res.ok) {
-            const errText = await res.text();
-            throw new Error(`${res.status}: ${errText.slice(0, 180)}`);
-        }
-        if (res.status === 204) return null;
-        return res.json();
-    },
-
-    async upload() {
-        if (!this.token) {
-            showToast('Connect GitHub token first.', 'error');
-            return;
-        }
-        try {
-            showToast('Uploading to GitHub…', 'info');
-            const content = this.exportPayload();
-            let gistId = this.gistId;
-
-            if (!gistId) {
-                const created = await this.api('/gists', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        description: 'KhataBook Pro private cloud backup',
-                        public: false,
-                        files: {
-                            [this.FILE_NAME]: { content }
-                        }
-                    })
-                });
-                gistId = created.id;
-                localStorage.setItem(this.GIST_KEY, gistId);
-            } else {
-                await this.api(`/gists/${gistId}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({
-                        files: {
-                            [this.FILE_NAME]: { content }
-                        }
-                    })
-                });
-            }
-
-            localStorage.setItem(this.LAST_SYNC_KEY, new Date().toISOString());
-            this.updateUI();
-            showToast('Data uploaded to private GitHub Gist!', 'success');
-        } catch (err) {
-            console.error('GitHub upload failed', err);
-            showToast(`GitHub upload failed: ${err.message}`, 'error');
-        }
-    },
-
-    async download() {
-        if (!this.token) {
-            showToast('Connect GitHub token first.', 'error');
-            return;
-        }
-        if (!this.gistId) {
-            showToast('No cloud backup found yet. Upload first.', 'error');
-            return;
-        }
-        if (!confirm('Restore will replace your current local data with the GitHub backup. Continue?')) {
-            return;
-        }
-        try {
-            showToast('Downloading from GitHub…', 'info');
-            const gist = await this.api(`/gists/${this.gistId}`);
-            const file = gist.files?.[this.FILE_NAME];
-            if (!file?.content && !file?.raw_url) {
-                throw new Error('Backup file missing in Gist');
-            }
-            let content = file.content;
-            if (!content && file.raw_url) {
-                const raw = await fetch(file.raw_url, {
-                    headers: { Authorization: `Bearer ${this.token}` }
-                });
-                content = await raw.text();
-            }
-            if (!db.importData(content)) {
-                throw new Error('Invalid backup format');
-            }
-            localStorage.setItem(this.LAST_SYNC_KEY, new Date().toISOString());
-            this.updateUI();
-            showToast('Data restored from GitHub!', 'success');
-            setTimeout(() => location.reload(), 700);
-        } catch (err) {
-            console.error('GitHub download failed', err);
-            showToast(`GitHub restore failed: ${err.message}`, 'error');
-        }
-    }
-};
-
-const GoogleDriveManager = {
-    CLIENT_ID: window.KHATA_CONFIG?.googleClientId,
-    API_KEY: window.KHATA_CONFIG?.googleApiKey,
-    DISCOVERY_DOC: 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
-    SCOPES: 'https://www.googleapis.com/auth/drive.file email profile',
-    
-    tokenClient: null,
-    gapiInited: false,
-    gisInited: false,
-    accessToken: null,
-    userEmail: null,
-
-    async init() {
-        const connectBtn = document.getElementById('btn-gdrive-connect');
-        if (connectBtn) {
-            connectBtn.disabled = true;
-            connectBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Initializing Google...';
-        }
-
-        console.log('Initializing Google Drive Manager...');
-        if (!this.CLIENT_ID || this.CLIENT_ID.includes("YOUR_CLIENT_ID")) {
-            console.warn("Google Drive Client ID not configured in site-config.js.");
-            if (connectBtn) {
-                connectBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Not Configured';
-                connectBtn.title = "Please add Client ID and API Key to site-config.js";
-            }
-            return;
-        }
-
-        // Wait for scripts to load if not already present
-        let retries = 0;
-        while ((typeof gapi === 'undefined' || typeof google === 'undefined') && retries < 10) {
-            console.log(`Waiting for Google API scripts... (Attempt ${retries + 1})`);
-            await new Promise(r => setTimeout(r, 1000));
-            retries++;
-        }
-
-        if (typeof gapi === 'undefined' || typeof google === 'undefined') {
-            console.error('Google scripts failed to load after 10 seconds.');
-            if (connectBtn) {
-                connectBtn.innerHTML = '<i class="fas fa-times"></i> Google Load Error';
-                connectBtn.disabled = false;
-            }
-            return;
-        }
-
-        try {
-            // Initialize GAPI
-            await new Promise((resolve, reject) => {
-                gapi.load('client', async () => {
-                    try {
-                        await gapi.client.init({
-                            apiKey: this.API_KEY,
-                            discoveryDocs: [this.DISCOVERY_DOC],
-                        });
-                        this.gapiInited = true;
-                        resolve();
-                    } catch (err) {
-                        reject(err);
-                    }
-                });
-            });
-
-            // Initialize GIS
-            this.tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: this.CLIENT_ID,
-                scope: this.SCOPES,
-                callback: '', // defined later
-            });
-            this.gisInited = true;
-            console.log('Google Drive initialized successfully');
-            
-            if (connectBtn) {
-                connectBtn.disabled = false;
-                connectBtn.innerHTML = '<i class="fab fa-google"></i> Connect Google Drive';
-            }
-
-            // Check for existing session
-            const savedToken = localStorage.getItem('gdrive-token');
-            if (savedToken) {
-                this.accessToken = savedToken;
-                this.userEmail = localStorage.getItem('gdrive-email');
-                this.updateUI(true);
-            }
-        } catch (err) {
-            console.error('Google Drive initialization failed:', err);
-            if (connectBtn) {
-                connectBtn.innerHTML = '<i class="fas fa-times"></i> Init Failed';
-                connectBtn.disabled = false;
-            }
-            showToast('Google Drive Init Failed. Check Console.', 'error');
-        }
-    },
-
-    async connect() {
-        console.log('Connect method called');
-        if (!this.gisInited || !this.tokenClient) {
-            const msg = 'Google Sync is still initializing. Please wait 5 seconds and try again.';
-            showToast(msg, 'info');
-            alert(msg); // Force alert for visibility
-            return;
-        }
-
-        return new Promise((resolve, reject) => {
-            try {
-                this.tokenClient.callback = async (resp) => {
-                    console.log('Google callback received:', resp);
-                    if (resp.error !== undefined) {
-                        showToast(`Google Error: ${resp.error}`, 'error');
-                        reject(resp);
-                        return;
-                    }
-                    this.accessToken = resp.access_token;
-                    localStorage.setItem('gdrive-token', this.accessToken);
-                    
-                    // Get user info
-                    try {
-                        const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                            headers: { Authorization: `Bearer ${this.accessToken}` }
-                        }).then(res => res.json());
-                        
-                        this.userEmail = userInfo.email;
-                        localStorage.setItem('gdrive-email', this.userEmail);
-                        this.updateUI(true);
-                        showToast(`Connected as ${this.userEmail}`, 'success');
-                        resolve(resp);
-                    } catch (e) {
-                        console.error('Failed to get user info', e);
-                        this.updateUI(true);
-                        resolve(resp);
-                    }
-                };
-
-                console.log('Requesting access token...');
-                this.tokenClient.requestAccessToken({ prompt: 'consent' });
-            } catch (err) {
-                console.error('requestAccessToken failed:', err);
-                showToast('Connection failed to start.', 'error');
-                reject(err);
-            }
-        });
-    },
-
-    disconnect() {
-        if (this.accessToken) {
-            google.accounts.oauth2.revoke(this.accessToken);
-            this.accessToken = null;
-            this.userEmail = null;
-            localStorage.removeItem('gdrive-token');
-            localStorage.removeItem('gdrive-email');
-            this.updateUI(false);
-            showToast('Google Drive disconnected', 'success');
-        }
-    },
-
-    async sync() {
-        if (!this.accessToken) return;
-
-        try {
-            showToast('Syncing with Google Drive...', 'info');
-            
-            // 1. Find the file in Drive
-            const response = await gapi.client.drive.files.list({
-                q: "name = 'khata_sync_data.json' and trashed = false",
-                fields: 'files(id, name, modifiedTime)',
-                spaces: 'drive',
-            });
-
-            const files = response.result.files;
-            const localData = JSON.stringify(db.data);
-            
-            if (files.length > 0) {
-                const file = files[0];
-                // 2. Compare modified times or just merge
-                // For simplicity, we'll download first to merge if needed, 
-                // but here we'll just implement a simple "Upload Local" approach 
-                // or "Download if newer"
-                
-                // Get Drive file content
-                const driveContent = await gapi.client.drive.files.get({
-                    fileId: file.id,
-                    alt: 'media',
-                }).then(res => res.body);
-
-                // Simple Merge Strategy: 
-                // We'll just ask the user or overwrite for now.
-                // Professional apps use complex merging, but we'll stick to 
-                // "Upload Latest" logic for this MVP.
-                
-                await this.upload(file.id, localData);
-            } else {
-                // Create new file
-                await this.createFile(localData);
-            }
-
-            const now = new Date().toLocaleTimeString();
-            localStorage.setItem('gdrive-last-sync', now);
-            this.updateUI(true);
-            showToast('Sync Successful!', 'success');
-        } catch (err) {
-            console.error('Sync failed', err);
-            showToast('Sync failed. Try connecting again.', 'error');
-            if (err.status === 401) this.disconnect();
-        }
-    },
-
-    async upload(fileId, content) {
-        return gapi.client.request({
-            path: `/upload/drive/v3/files/${fileId}`,
-            method: 'PATCH',
-            params: { uploadType: 'media' },
-            body: content,
-        });
-    },
-
-    async createFile(content) {
-        const metadata = {
-            name: 'khata_sync_data.json',
-            mimeType: 'application/json',
-        };
-
-        const file = await gapi.client.drive.files.create({
-            resource: metadata,
-            fields: 'id',
-        });
-
-        return this.upload(file.result.id, content);
-    },
-
-    updateUI(connected) {
-        const statusDiv = document.getElementById('gdrive-sync-status');
-        const connectBtn = document.getElementById('btn-gdrive-connect');
-        const actionsDiv = document.getElementById('gdrive-actions');
-        const emailEl = document.getElementById('gdrive-user-email');
-        const lastSyncEl = document.getElementById('gdrive-last-sync');
-
-        if (connected) {
-            statusDiv.style.display = 'block';
-            connectBtn.style.display = 'none';
-            actionsDiv.style.display = 'flex';
-            emailEl.textContent = this.userEmail || 'Connected';
-            const lastSync = localStorage.getItem('gdrive-last-sync');
-            lastSyncEl.textContent = `Last sync: ${lastSync || 'Never'}`;
-        } else {
-            statusDiv.style.display = 'none';
-            connectBtn.style.display = 'flex';
-            actionsDiv.style.display = 'none';
-        }
-    }
-};
 
 class DataManager {
     constructor() {
@@ -530,6 +108,7 @@ class DataManager {
         }
         localStorage.setItem('khata-data', JSON.stringify(this.data));
         this.updateUndoRedoButtons();
+        if (window.AccountCloud) AccountCloud.queueSync();
     }
 
     undo() {
@@ -866,8 +445,26 @@ class DataManager {
 
     resetData() {
         if (confirm('Are you SURE you want to delete ALL data? This cannot be undone.')) {
-            localStorage.removeItem('khata-data');
-            location.reload();
+            this.data = {
+                customers: [],
+                rooznamcha: [],
+                trash: [],
+                settings: {
+                    shopName: this.data.settings.shopName || 'My Business',
+                    currency: this.data.settings.currency || 'Rs.',
+                    language: this.data.settings.language || 'en',
+                    backupFolderPath: null,
+                    nextKhataNo: 1,
+                    nextTransactionNo: 1001
+                }
+            };
+            localStorage.setItem('khata-data', JSON.stringify(this.data));
+            const finish = () => location.reload();
+            if (window.AccountCloud && AccountCloud.user) {
+                AccountCloud.pushToCloud(false).finally(finish);
+            } else {
+                finish();
+            }
         }
     }
 
@@ -945,12 +542,6 @@ function formatMoney(amount, currency) {
     return `${sym} ${Number(amount || 0).toLocaleString()}`;
 }
 
-function isBackupActive() {
-    if (!db.data.settings.backupFolderPath) return false;
-    if (window.electronAPI) return true;
-    return !!window.browserDirectoryHandle;
-}
-
 function getCashTrendPercent() {
     const today = new Date();
     let current = 0;
@@ -995,21 +586,20 @@ function applySiteConfig() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Accounts first — app UI stays hidden until signed in
+    if (window.AccountCloud) await AccountCloud.init();
     initApp();
 });
 
 let cashflowChart = null;
 let distributionChart = null;
-let backupTimerSeconds = 60;
 
 async function initApp() {
     applySiteConfig();
-    GoogleDriveManager.init();
     setupNavigation();
     setupThemeToggle();
     setupMobileNav();
-    setupWebBanner();
     setupModalHandlers();
     setupFilterHandlers();
     setupSearchHandlers();
@@ -1023,103 +613,6 @@ async function initApp() {
     const roozDateFilter = document.getElementById('rooznamcha-date-filter');
     if (roozDateFilter && !roozDateFilter.value) roozDateFilter.value = todayStr;
     updateUI();
-    renderBackupBanner();
-    
-    // Restore Browser Folder Handle if possible
-    if (!window.electronAPI && window.showDirectoryPicker) {
-        const savedHandle = await HandleStore.get();
-        if (savedHandle) {
-            window.browserDirectoryHandle = savedHandle;
-            // Test if we still have permission
-            const permission = await savedHandle.queryPermission({ mode: 'readwrite' });
-            if (permission === 'granted') {
-                performAutoBackup();
-            }
-        }
-    }
-    
-    // Auto-Backup Timer Setup
-    backupTimerSeconds = 60;
-    setInterval(() => {
-        const timerText = document.getElementById('backup-timer-text');
-        backupTimerSeconds--;
-        
-        if (backupTimerSeconds <= 0) {
-            performAutoBackup();
-            backupTimerSeconds = 60;
-        }
-        
-        if (timerText) {
-            timerText.innerText = `Next backup in: ${backupTimerSeconds}s`;
-        }
-    }, 1000);
-
-    // Initial check for backup status (Browser/Electron)
-    setTimeout(async () => {
-        const indicatorContainer = document.getElementById('backup-indicator-mini');
-        const indicatorText = document.getElementById('backup-indicator-text');
-        const indicatorIcon = document.querySelector('#backup-indicator-mini i');
-
-        if (!db.data.settings.backupFolderPath) {
-            // Case 1: NEVER SET UP - Force new user to set backup folder
-            if (indicatorContainer) indicatorContainer.classList.add('inactive');
-            if (indicatorText) indicatorText.innerText = 'Backup: NOT SET';
-            
-            showToast('IMPORTANT: Please select a backup folder to keep your data safe!', 'error');
-            // Switch to settings view automatically
-            document.querySelector('[data-view="settings"]')?.click();
-            // Highlight the backup section
-            const backupSection = document.querySelector('.form-group.highlight');
-            if (backupSection) {
-                backupSection.style.boxShadow = '0 0 15px var(--danger)';
-                setTimeout(() => backupSection.style.boxShadow = '', 3000);
-            }
-        } else if (!window.electronAPI && db.data.settings.backupFolderPath) {
-            // Case 2: ALREADY SET BUT PAUSED (Browser) - Re-grant permission
-            const backupStatus = document.getElementById('backup-status-text');
-            const hasHandle = !!window.browserDirectoryHandle;
-            
-            if (!hasHandle) {
-                if (indicatorContainer) indicatorContainer.classList.add('inactive');
-                if (indicatorText) indicatorText.innerText = 'Backup: PAUSED';
-                if (indicatorIcon) indicatorIcon.style.color = 'var(--danger)';
-
-                if (backupStatus) {
-                    backupStatus.innerHTML = `<span style="color:var(--danger)">Backup paused.</span> <a href="#" id="link-resume-backup" style="color:var(--primary); text-decoration:underline; font-weight:700;">Click to Activate Folder</a>`;
-                    document.getElementById('link-resume-backup')?.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        document.getElementById('btn-select-backup-folder')?.click();
-                    });
-                }
-                showToast('Action Required: Click Settings to activate backup folder.', 'error');
-            }
-        }
-    }, 2000);
-
-    // 5-Minute Backup Caution (for users who still haven't activated backup)
-    setInterval(() => {
-        if (!db.data.settings.backupFolderPath || (!window.electronAPI && !window.browserDirectoryHandle)) {
-            showToast('CRITICAL: You have not activated the backup folder! Go to Settings and activate it now to prevent data loss.', 'error');
-            
-            // If they are not on the settings page, give them a stronger visual hint
-            const activeView = document.querySelector('.view.active');
-            if (activeView && activeView.id !== 'settings-view') {
-                // We could also force open settings again if you want to be very strict
-                // document.querySelector('[data-view="settings"]')?.click();
-            }
-        }
-    }, 300000); // 300,000ms = 5 minutes
-
-    // Browser only — blocks Electron window close if used in desktop app
-    if (!window.electronAPI) {
-        window.addEventListener('beforeunload', (e) => {
-            if (isBackupActive()) return;
-            const message = 'Backup is not active. Your latest data may not be saved to a folder. Leave anyway?';
-            e.preventDefault();
-            e.returnValue = message;
-            return message;
-        });
-    }
 
     // Global Keyboard Shortcuts
     document.addEventListener('keydown', (e) => {
@@ -1139,44 +632,19 @@ async function initApp() {
 }
 
 function renderBackupBanner() {
-    const dashboardHeader = document.querySelector('#dashboard-view .view-header');
-    if (!dashboardHeader) return;
-
-    // Remove old banner if exists
     document.getElementById('backup-alert-banner')?.remove();
+}
 
-    if (!isBackupActive()) {
-        const banner = document.createElement('div');
-        banner.id = 'backup-alert-banner';
-        banner.style.cssText = `
-            background: linear-gradient(90deg, #ef4444, #f87171);
-            color: white;
-            padding: 1rem;
-            border-radius: 12px;
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
-            animation: pulse 2s infinite;
-        `;
-        
-        const folderSet = !!db.data.settings.backupFolderPath;
-        const message = !folderSet ? 'BACKUP NOT ACTIVE! Please select a backup folder.' : 'BACKUP PAUSED! Click to resume folder access.';
-        const btnText = !folderSet ? 'Setup Backup' : 'Resume Backup';
-        
-        banner.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <i class="fas fa-exclamation-triangle" style="font-size: 1.5rem;"></i>
-                <div>
-                    <strong style="display: block;">${message}</strong>
-                    <span style="font-size: 0.85rem; opacity: 0.9;">Your data is not being saved locally. Click the button to fix.</span>
-                </div>
-            </div>
-            <button class="btn btn-primary" style="background: white; color: #ef4444; border: none; padding: 0.5rem 1rem; font-size: 0.85rem;" onclick="document.querySelector('[data-view=\\'settings\\']').click(); setTimeout(() => document.getElementById('btn-select-backup-folder').click(), 200)">${btnText}</button>
-        `;
-        dashboardHeader.after(banner);
-    }
+function isBackupActive() {
+    return !!(window.AccountCloud && AccountCloud.user);
+}
+
+async function performAutoBackup() {
+    if (window.AccountCloud) await AccountCloud.syncNow(false);
+}
+
+function setupWebBanner() {
+    // Manual/local backup banner removed — cloud accounts handle sync.
 }
 
 /**
@@ -1295,28 +763,11 @@ function setupSettingsHandlers() {
     const shopNameInput = document.getElementById('setting-shop-name');
     const currencyInput = document.getElementById('setting-currency');
     const languageInput = document.getElementById('setting-language');
-    const backupPathDisplay = document.getElementById('setting-backup-path-display');
-    const selectBackupBtn = document.getElementById('btn-select-backup-folder');
-    const backupNowBtn = document.getElementById('btn-backup-now');
     const resetBtn = document.getElementById('btn-reset-data');
 
-    // Populate initial values
     if (shopNameInput) shopNameInput.value = db.data.settings.shopName || 'My Business';
     if (currencyInput) currencyInput.value = db.data.settings.currency || 'Rs.';
     if (languageInput) languageInput.value = db.data.settings.language || 'en';
-    
-    // Update backup path display
-    if (backupPathDisplay) {
-        if (db.data.settings.backupFolderPath) {
-            if (window.electronAPI) {
-                backupPathDisplay.innerText = db.data.settings.backupFolderPath;
-            } else {
-                backupPathDisplay.innerHTML = `<span style="color:var(--primary); font-weight:700;">BROWSER FOLDER:</span> ${db.data.settings.backupFolderPath}`;
-            }
-        } else {
-            backupPathDisplay.innerText = 'No folder selected';
-        }
-    }
 
     settingsForm?.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -1326,175 +777,11 @@ function setupSettingsHandlers() {
         updateUI();
     });
 
-    backupNowBtn?.addEventListener('click', () => {
-        performAutoBackup();
-        // Reset countdown
-        const timerText = document.getElementById('backup-timer-text');
-        if (typeof backupTimerSeconds !== 'undefined') {
-            backupTimerSeconds = 60;
-            if (timerText) timerText.innerText = `Next backup in: 60s`;
-        }
-    });
-
-    selectBackupBtn?.addEventListener('click', async () => {
-        console.log('Select Backup Folder button clicked');
-        if (window.electronAPI) {
-            const folderPath = await window.electronAPI.selectFolder();
-            if (folderPath) {
-                db.data.settings.backupFolderPath = folderPath;
-                db.save();
-                if (backupPathDisplay) backupPathDisplay.innerText = folderPath;
-                showToast('Backup folder updated!', 'success');
-                performAutoBackup(); 
-                renderBackupBanner();
-            }
-        } else if (window.showDirectoryPicker) {
-            try {
-                // Always open picker when user clicks this button to allow changing folder
-                const handle = await window.showDirectoryPicker({
-                    mode: 'readwrite'
-                });
-                
-                window.browserDirectoryHandle = handle;
-                db.data.settings.backupFolderPath = handle.name; // Store name for display
-                db.save();
-                await HandleStore.save(handle); // Save handle for future sessions
-                
-                if (backupPathDisplay) backupPathDisplay.innerHTML = `<span style="color:var(--primary); font-weight:700;">BROWSER FOLDER:</span> ${handle.name}`;
-                showToast('Browser Auto-backup enabled!', 'success');
-                performAutoBackup();
-                renderBackupBanner();
-            } catch (err) {
-                console.error('Directory selection failed:', err);
-                if (err.name === 'AbortError') return;
-                showToast('Failed to access folder. Use Chrome or Edge.', 'error');
-            }
-        } else {
-            showToast('Browser not supported. Use Desktop App or Chrome/Edge.', 'error');
-        }
-    });
-
     resetBtn?.addEventListener('click', () => {
         db.resetData();
     });
 
-    // Google Drive Sync Handlers
-    const gDriveBtn = document.getElementById('btn-gdrive-connect');
-    gDriveBtn?.addEventListener('click', (e) => {
-        e.preventDefault();
-        console.log('Connect Google Drive button clicked');
-        
-        // Visual feedback that click happened
-        const originalText = gDriveBtn.innerHTML;
-        gDriveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Opening Popup...';
-        
-        GoogleDriveManager.connect().finally(() => {
-            // Restore text if it didn't connect (UI update will handle success state)
-            if (!GoogleDriveManager.accessToken) {
-                gDriveBtn.innerHTML = originalText;
-            }
-        });
-    });
-
-    document.getElementById('btn-gdrive-sync-now')?.addEventListener('click', () => {
-        GoogleDriveManager.sync();
-    });
-
-    document.getElementById('btn-gdrive-disconnect')?.addEventListener('click', () => {
-        GoogleDriveManager.disconnect();
-    });
-
-    // GitHub Cloud Backup
-    GitHubCloudManager.init();
-    document.getElementById('btn-github-save-token')?.addEventListener('click', () => {
-        const token = document.getElementById('github-token-input')?.value || '';
-        GitHubCloudManager.saveToken(token);
-    });
-    document.getElementById('btn-github-upload')?.addEventListener('click', () => GitHubCloudManager.upload());
-    document.getElementById('btn-github-download')?.addEventListener('click', () => GitHubCloudManager.download());
-    document.getElementById('btn-github-disconnect')?.addEventListener('click', () => GitHubCloudManager.disconnect());
-}
-
-async function performAutoBackup() {
-    const folderPath = db.data.settings.backupFolderPath;
-    const statusText = document.getElementById('backup-status-text');
-    const indicatorText = document.getElementById('backup-indicator-text');
-    const indicatorContainer = document.getElementById('backup-indicator-mini');
-    const indicatorIcon = document.querySelector('#backup-indicator-mini i');
-
-    console.log('Auto-backup triggered...', { folderPath, hasHandle: !!window.browserDirectoryHandle });
-    
-    if (!folderPath) {
-        if (statusText) {
-            statusText.innerText = 'Auto-backup status: Not Configured';
-            statusText.style.color = 'var(--text-muted)';
-        }
-        return;
-    }
-
-    const data = JSON.stringify(db.data, null, 2);
-    let result = { success: false };
-
-    // Case 1: Electron Desktop App
-    if (window.electronAPI) {
-        result = await window.electronAPI.saveBackup(folderPath, data);
-    } 
-    // Case 2: Modern Browser (Chrome/Edge)
-    else if (window.browserDirectoryHandle) {
-        try {
-            const permission = await window.browserDirectoryHandle.queryPermission({ mode: 'readwrite' });
-            if (permission !== 'granted') {
-                result = { success: false, error: 'Permission expired. Click Select Folder to resume.' };
-            } else {
-                const fileName = `khata_auto_backup.json`;
-                
-                const fileHandle = await window.browserDirectoryHandle.getFileHandle(fileName, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(data);
-                await writable.close();
-                result = { success: true };
-            }
-        } catch (err) {
-            console.error('Browser backup failed:', err);
-            result = { success: false, error: 'Folder access lost. Click Select Folder again.' };
-        }
-    } else {
-        // We have a path saved, but no active handle (browser security)
-        result = { success: false, error: 'Folder access needed for this session. Click Select Folder to activate.' };
-    }
-    
-    if (result.success) {
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        if (statusText) {
-            statusText.innerText = `Last Backup Success: ${timeStr}`;
-            statusText.style.color = 'var(--success)';
-        }
-        if (indicatorText) indicatorText.innerText = 'Backup: Active';
-        if (indicatorIcon) indicatorIcon.style.color = 'var(--success)';
-        if (indicatorContainer) {
-            indicatorContainer.classList.remove('inactive');
-            indicatorContainer.title = "Backup is active and protecting your data.";
-        }
-        showToast(`Auto-backup saved at ${timeStr}`, 'backup');
-        renderBackupBanner();
-    } else {
-        if (statusText) {
-            statusText.innerText = result.error;
-            statusText.style.color = 'var(--danger)';
-        }
-        if (indicatorText) indicatorText.innerText = 'Backup: NOT ACTIVE';
-        if (indicatorIcon) indicatorIcon.style.color = 'var(--danger)';
-        if (indicatorContainer) {
-            indicatorContainer.classList.add('inactive');
-            indicatorContainer.title = "Action Required: Click Settings to activate backup.";
-        }
-        
-        // Only show error toast if there was an actual attempt that failed (not just missing handle)
-        if (result.error && !result.error.includes('needed for this session')) {
-            showToast(`Backup: ${result.error}`, 'error');
-        }
-    }
+    if (window.AccountCloud) AccountCloud.updateAccountWidgets();
 }
 
 /**
@@ -1587,7 +874,7 @@ function setupFilterHandlers() {
             netEl.className = `value ${stats.net >= 0 ? 'text-success' : 'text-danger'}`;
         }
 
-        const rangeLabel = `${start || 'Beginning'} → ${end || 'Today'}`;
+        const rangeLabel = `${start || 'Beginning'} â†’ ${end || 'Today'}`;
         showToast(`Filtered report: ${rangeLabel}`, 'success');
     });
 }
@@ -1633,17 +920,7 @@ function setupMobileNav() {
 }
 
 function setupWebBanner() {
-    const banner = document.getElementById('web-mode-banner');
-    const dismissBtn = document.getElementById('btn-dismiss-web-banner');
-    if (!banner || window.electronAPI) return;
-
-    if (localStorage.getItem('khata-web-banner-dismissed') === '1') return;
-
-    banner.hidden = false;
-    dismissBtn?.addEventListener('click', () => {
-        banner.hidden = true;
-        localStorage.setItem('khata-web-banner-dismissed', '1');
-    });
+    // Removed — cloud accounts replace local/web backup banners.
 }
 
 function updateProfileDisplay() {
@@ -1662,6 +939,7 @@ function updateProfileDisplay() {
     if (avatarEl) avatarEl.textContent = initials;
 
     document.title = `${shopName} - KhataBook Pro`;
+    if (window.AccountCloud) AccountCloud.updateAccountWidgets();
 }
 
 function printRoozReport(dateFilter) {

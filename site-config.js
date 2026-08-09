@@ -1,11 +1,19 @@
 /**
- * Set these when your site is live. Leave null to hide broken external links.
+ * Site + cloud account configuration.
+ * Website is hosted on GitHub Pages.
+ * User ledgers are private in Firebase (each account only sees its own data).
  */
 window.KHATA_CONFIG = {
   websiteUrl: "https://madadkhan11111.github.io/KHATA-/",
   desktopDownloadUrl: null,
-  // Google Drive API Configuration
-  // Get these from: https://console.cloud.google.com/
-  googleClientId: "395256718430-t35pvldtuputesan0r9e3alivr90menm.apps.googleusercontent.com",
-  googleApiKey: "AIzaSyCq9aAgG70_qO-TYVc981zTaVP1vHYBo9I"
+
+  // Paste your Firebase web config here (Firebase Console → Project settings → Your apps)
+  firebase: {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  }
 };
