@@ -60,7 +60,6 @@ const AccountCloud = {
     bindAuthUi() {
         document.getElementById('btn-auth-login')?.addEventListener('click', () => this.loginEmail());
         document.getElementById('btn-auth-signup')?.addEventListener('click', () => this.signupEmail());
-        document.getElementById('btn-auth-reset')?.addEventListener('click', () => this.resetPassword());
         document.getElementById('btn-auth-google')?.addEventListener('click', () => this.loginGoogle());
         document.getElementById('btn-auth-logout')?.addEventListener('click', () => this.logout());
         document.getElementById('btn-auth-logout-side')?.addEventListener('click', () => this.logout());
@@ -75,69 +74,46 @@ const AccountCloud = {
         });
         document.getElementById('link-forgot-password')?.addEventListener('click', (e) => {
             e.preventDefault();
-            this.toggleAuthMode('reset');
+            this.resetPassword();
         });
     },
 
     toggleAuthMode(mode) {
         const isSignup = mode === 'signup';
-        const isReset = mode === 'reset';
-        const isLogin = !isSignup && !isReset;
         const title = document.getElementById('auth-title');
         const sub = document.getElementById('auth-subtitle');
         const loginBtn = document.getElementById('btn-auth-login');
         const signupBtn = document.getElementById('btn-auth-signup');
-        const resetBtn = document.getElementById('btn-auth-reset');
-        const googleBtn = document.getElementById('btn-auth-google');
-        const divider = document.getElementById('auth-divider');
-        const passwordGroup = document.getElementById('auth-password-group');
         const forgotWrap = document.getElementById('auth-forgot-wrap');
         const switchLogin = document.getElementById('auth-switch-login');
         const switchSignup = document.getElementById('auth-switch-signup');
 
-        if (title) {
-            title.textContent = isReset
-                ? 'Reset password'
-                : (isSignup ? 'Create your account' : 'Welcome back');
-        }
+        if (title) title.textContent = isSignup ? 'Create your account' : 'Welcome back';
         if (sub) {
-            sub.textContent = isReset
-                ? 'Enter your email. We will send a reset link.'
-                : (isSignup
-                    ? 'Create a free account — your book syncs privately.'
-                    : 'Log in to open your book on this device.');
+            sub.textContent = isSignup
+                ? 'Create a free account — your book syncs privately.'
+                : 'Log in to open your Khata book.';
         }
-
-        const show = (el, yes, display = 'inline-flex') => {
-            if (!el) return;
-            el.hidden = !yes;
-            el.style.display = yes ? display : 'none';
-        };
-
-        show(loginBtn, isLogin);
-        show(signupBtn, isSignup);
-        show(resetBtn, isReset);
-        show(googleBtn, isLogin || isSignup);
-        show(divider, isLogin || isSignup, 'flex');
-        show(passwordGroup, isLogin || isSignup, 'block');
-        show(forgotWrap, isLogin, 'block');
-        show(switchLogin, isSignup || isReset, 'block');
-        show(switchSignup, isLogin, 'block');
-
-        if (switchLogin && isReset) {
-            switchLogin.innerHTML = 'Remember password? <a href="#" id="link-show-login">Log in</a>';
-            document.getElementById('link-show-login')?.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.toggleAuthMode('login');
-            });
-        } else if (switchLogin && isSignup) {
-            switchLogin.innerHTML = 'Already have an account? <a href="#" id="link-show-login">Log in</a>';
-            document.getElementById('link-show-login')?.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.toggleAuthMode('login');
-            });
+        if (loginBtn) {
+            loginBtn.hidden = isSignup;
+            loginBtn.style.display = isSignup ? 'none' : 'inline-flex';
         }
-
+        if (signupBtn) {
+            signupBtn.hidden = !isSignup;
+            signupBtn.style.display = isSignup ? 'inline-flex' : 'none';
+        }
+        if (forgotWrap) {
+            forgotWrap.hidden = isSignup;
+            forgotWrap.style.display = isSignup ? 'none' : 'block';
+        }
+        if (switchLogin) {
+            switchLogin.hidden = !isSignup;
+            switchLogin.style.display = isSignup ? 'block' : 'none';
+        }
+        if (switchSignup) {
+            switchSignup.hidden = isSignup;
+            switchSignup.style.display = isSignup ? 'none' : 'block';
+        }
         this.setAuthMessage('');
     },
 
@@ -261,29 +237,26 @@ const AccountCloud = {
         if (!this.ready) return;
         const { email } = this.getAuthFields();
         if (!email) {
-            this.setAuthMessage('Enter your account email.');
+            this.setAuthMessage('First type your email above, then click Forgot password.');
+            document.getElementById('auth-email')?.focus();
             return;
         }
         try {
             this.setAuthMessage('Sending reset email…', false);
-            const continueUrl = window.KHATA_CONFIG?.websiteUrl || window.location.origin + window.location.pathname;
-            const actionCodeSettings = {
+            const continueUrl = window.KHATA_CONFIG?.websiteUrl || (window.location.origin + window.location.pathname);
+            await this.auth.sendPasswordResetEmail(email, {
                 url: continueUrl,
                 handleCodeInApp: false
-            };
-            await this.auth.sendPasswordResetEmail(email, actionCodeSettings);
-            this.setAuthMessage(
-                'If this email has a password account, Firebase sent a reset link. Check Inbox + Spam/Junk. Wait 2–5 minutes. Google-login users should use Continue with Google.',
-                false
-            );
+            });
+            this.setAuthMessage('Reset email sent. Check Inbox and Spam (from noreply@khata-your.firebaseapp.com).', false);
         } catch (err) {
             const code = err?.code || '';
             if (code === 'auth/user-not-found') {
-                this.setAuthMessage('No password account found with this email. Try Continue with Google, or create account.');
+                this.setAuthMessage('No email/password account found. If you use Google login, click Continue with Google.');
             } else if (code === 'auth/invalid-email') {
                 this.setAuthMessage('Enter a valid email address.');
             } else if (code === 'auth/too-many-requests') {
-                this.setAuthMessage('Too many tries. Wait a few minutes, then try again.');
+                this.setAuthMessage('Too many tries. Wait a few minutes.');
             } else {
                 this.setAuthMessage(err.message || 'Could not send reset email.');
             }
