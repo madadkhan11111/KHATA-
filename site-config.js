@@ -2,7 +2,7 @@
  * Set these when your site is live. Leave null to hide broken external links.
  */
 window.KHATA_CONFIG = {
-  websiteUrl: "https://madadkhan11111.github.io/khata-book-pro/",
+  websiteUrl: "https://madadkhan11111.github.io/KHATA-/",
   desktopDownloadUrl: null,
   // Google Drive API Configuration
   // Get these from: https://console.cloud.google.com/
