@@ -266,14 +266,24 @@ const AccountCloud = {
         }
         try {
             this.setAuthMessage('Sending reset email…', false);
-            await this.auth.sendPasswordResetEmail(email);
-            this.setAuthMessage('Reset link sent. Check your email inbox (and Spam).', false);
+            const continueUrl = window.KHATA_CONFIG?.websiteUrl || window.location.origin + window.location.pathname;
+            const actionCodeSettings = {
+                url: continueUrl,
+                handleCodeInApp: false
+            };
+            await this.auth.sendPasswordResetEmail(email, actionCodeSettings);
+            this.setAuthMessage(
+                'If this email has a password account, Firebase sent a reset link. Check Inbox + Spam/Junk. Wait 2–5 minutes. Google-login users should use Continue with Google.',
+                false
+            );
         } catch (err) {
             const code = err?.code || '';
             if (code === 'auth/user-not-found') {
-                this.setAuthMessage('No account found with this email.');
+                this.setAuthMessage('No password account found with this email. Try Continue with Google, or create account.');
             } else if (code === 'auth/invalid-email') {
                 this.setAuthMessage('Enter a valid email address.');
+            } else if (code === 'auth/too-many-requests') {
+                this.setAuthMessage('Too many tries. Wait a few minutes, then try again.');
             } else {
                 this.setAuthMessage(err.message || 'Could not send reset email.');
             }
