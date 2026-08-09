@@ -60,6 +60,7 @@ const AccountCloud = {
     bindAuthUi() {
         document.getElementById('btn-auth-login')?.addEventListener('click', () => this.loginEmail());
         document.getElementById('btn-auth-signup')?.addEventListener('click', () => this.signupEmail());
+        document.getElementById('btn-auth-reset')?.addEventListener('click', () => this.resetPassword());
         document.getElementById('btn-auth-google')?.addEventListener('click', () => this.loginGoogle());
         document.getElementById('btn-auth-logout')?.addEventListener('click', () => this.logout());
         document.getElementById('btn-auth-logout-side')?.addEventListener('click', () => this.logout());
@@ -72,38 +73,71 @@ const AccountCloud = {
             e.preventDefault();
             this.toggleAuthMode('login');
         });
+        document.getElementById('link-forgot-password')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.toggleAuthMode('reset');
+        });
     },
 
     toggleAuthMode(mode) {
         const isSignup = mode === 'signup';
+        const isReset = mode === 'reset';
+        const isLogin = !isSignup && !isReset;
         const title = document.getElementById('auth-title');
         const sub = document.getElementById('auth-subtitle');
         const loginBtn = document.getElementById('btn-auth-login');
         const signupBtn = document.getElementById('btn-auth-signup');
+        const resetBtn = document.getElementById('btn-auth-reset');
+        const googleBtn = document.getElementById('btn-auth-google');
+        const divider = document.getElementById('auth-divider');
+        const passwordGroup = document.getElementById('auth-password-group');
+        const forgotWrap = document.getElementById('auth-forgot-wrap');
         const switchLogin = document.getElementById('auth-switch-login');
         const switchSignup = document.getElementById('auth-switch-signup');
-        if (title) title.textContent = isSignup ? 'Create your account' : 'Welcome back';
+
+        if (title) {
+            title.textContent = isReset
+                ? 'Reset password'
+                : (isSignup ? 'Create your account' : 'Welcome back');
+        }
         if (sub) {
-            sub.textContent = isSignup
-                ? 'Create a free account — your book syncs privately.'
-                : 'Log in to open your book on this device.';
+            sub.textContent = isReset
+                ? 'Enter your email. We will send a reset link.'
+                : (isSignup
+                    ? 'Create a free account — your book syncs privately.'
+                    : 'Log in to open your book on this device.');
         }
-        if (loginBtn) {
-            loginBtn.hidden = isSignup;
-            loginBtn.style.display = isSignup ? 'none' : 'inline-flex';
+
+        const show = (el, yes, display = 'inline-flex') => {
+            if (!el) return;
+            el.hidden = !yes;
+            el.style.display = yes ? display : 'none';
+        };
+
+        show(loginBtn, isLogin);
+        show(signupBtn, isSignup);
+        show(resetBtn, isReset);
+        show(googleBtn, isLogin || isSignup);
+        show(divider, isLogin || isSignup, 'flex');
+        show(passwordGroup, isLogin || isSignup, 'block');
+        show(forgotWrap, isLogin, 'block');
+        show(switchLogin, isSignup || isReset, 'block');
+        show(switchSignup, isLogin, 'block');
+
+        if (switchLogin && isReset) {
+            switchLogin.innerHTML = 'Remember password? <a href="#" id="link-show-login">Log in</a>';
+            document.getElementById('link-show-login')?.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.toggleAuthMode('login');
+            });
+        } else if (switchLogin && isSignup) {
+            switchLogin.innerHTML = 'Already have an account? <a href="#" id="link-show-login">Log in</a>';
+            document.getElementById('link-show-login')?.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.toggleAuthMode('login');
+            });
         }
-        if (signupBtn) {
-            signupBtn.hidden = !isSignup;
-            signupBtn.style.display = isSignup ? 'inline-flex' : 'none';
-        }
-        if (switchLogin) {
-            switchLogin.hidden = !isSignup;
-            switchLogin.style.display = isSignup ? 'block' : 'none';
-        }
-        if (switchSignup) {
-            switchSignup.hidden = isSignup;
-            switchSignup.style.display = isSignup ? 'none' : 'block';
-        }
+
         this.setAuthMessage('');
     },
 
@@ -183,7 +217,7 @@ const AccountCloud = {
         const el = document.getElementById('auth-message');
         if (!el) return;
         el.textContent = msg || '';
-        el.style.color = isError ? 'var(--danger)' : 'var(--success)';
+        el.style.color = isError ? '#fda4af' : '#5eead4';
     },
 
     getAuthFields() {
@@ -220,6 +254,29 @@ const AccountCloud = {
             await this.auth.signInWithEmailAndPassword(email, password);
         } catch (err) {
             this.setAuthMessage(err.message || 'Login failed');
+        }
+    },
+
+    async resetPassword() {
+        if (!this.ready) return;
+        const { email } = this.getAuthFields();
+        if (!email) {
+            this.setAuthMessage('Enter your account email.');
+            return;
+        }
+        try {
+            this.setAuthMessage('Sending reset email…', false);
+            await this.auth.sendPasswordResetEmail(email);
+            this.setAuthMessage('Reset link sent. Check your email inbox (and Spam).', false);
+        } catch (err) {
+            const code = err?.code || '';
+            if (code === 'auth/user-not-found') {
+                this.setAuthMessage('No account found with this email.');
+            } else if (code === 'auth/invalid-email') {
+                this.setAuthMessage('Enter a valid email address.');
+            } else {
+                this.setAuthMessage(err.message || 'Could not send reset email.');
+            }
         }
     },
 
