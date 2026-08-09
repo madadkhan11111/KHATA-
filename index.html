@@ -117,6 +117,9 @@
                         <span class="status">Online</span>
                     </div>
                 </div>
+                <button type="button" class="btn btn-secondary" id="btn-auth-logout" style="width:100%; justify-content:center; margin-top:0.5rem;">
+                    <i class="fas fa-sign-out-alt"></i> Log Out
+                </button>
                 <span class="app-version" id="app-version">v1.0.0</span>
             </div>
         </aside>
@@ -499,37 +502,12 @@
                             </form>
                         </div>
 
-                        <div class="content-card">
-                            <div class="card-header">
-                                <h3>Your Firebase Cloud Account</h3>
-                            </div>
-                            <div style="display: flex; flex-direction: column; gap: 1rem;">
-                                <p class="text-muted" style="font-size: 0.9rem;">
-                                    No manual backup folder. Your Khata data syncs automatically to <strong>Firebase Cloud</strong> for your account.
-                                </p>
-                                <div id="account-panel" style="padding: 0.75rem; border-radius: var(--radius-md); background: var(--bg-main); border: 1px solid var(--border);">
-                                    <div style="font-weight: 600;" id="account-user-email">Not signed in</div>
-                                    <div class="text-muted" style="font-size: 0.8rem; margin-top: 0.35rem;" id="account-sync-status">Sign in to sync with Firebase.</div>
-                                </div>
-                                <button type="button" class="btn btn-success" id="btn-cloud-sync-now" style="width: 100%; justify-content: center;">
-                                    <i class="fas fa-cloud-upload-alt"></i> Sync Now
-                                </button>
-                                <button type="button" class="btn btn-danger" id="btn-auth-logout" style="width: 100%; justify-content: center;">
-                                    <i class="fas fa-sign-out-alt"></i> Log Out
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="content-card">
-                            <div class="card-header">
-                                <h3>Data Management</h3>
-                            </div>
-                            <div style="display: flex; flex-direction: column; gap: 1rem;">
-                                <p class="text-muted" style="font-size: 0.9rem;">Resetting all data will permanently delete your records from this account. This cannot be undone.</p>
-                                <button class="btn btn-danger" id="btn-reset-data">
-                                    <i class="fas fa-trash-alt"></i> Reset All Data
-                                </button>
-                            </div>
+                        <!-- Hidden stubs so optional settings IDs still exist -->
+                        <div hidden aria-hidden="true">
+                            <div id="account-user-email"></div>
+                            <div id="account-sync-status"></div>
+                            <button type="button" id="btn-cloud-sync-now"></button>
+                            <button type="button" id="btn-reset-data"></button>
                         </div>
                     </div>
                 </section>
