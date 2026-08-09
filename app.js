@@ -4,34 +4,34 @@
 
 const translations = {
     en: {
-        dashboard: 'Home',
-        khata: 'Customers',
-        rooznamcha: 'Daily Book',
+        dashboard: 'Dashboard',
+        khata: 'Khata Book',
+        rooznamcha: 'Rooznamcha',
         reports: 'Reports',
         settings: 'Settings',
         trash: 'Trash',
-        cashInHand: 'Cash / نقدی',
-        receivables: 'Receivable / لینے',
-        payables: 'Payable / دینے',
+        cashInHand: 'Cash in Hand',
+        receivables: 'Total Receivables',
+        payables: 'Total Payables',
         newEntry: 'New Entry',
         addCustomer: 'Add Customer',
         addIncome: 'Add Income',
         addExpense: 'Add Expense'
     },
     ur: {
-        dashboard: 'گھر',
-        khata: 'کھاتہ',
-        rooznamcha: 'روزناملہ',
-        reports: 'رپورٹ',
-        settings: 'سیٹنگ',
-        trash: 'کچرا',
-        cashInHand: 'نقدی',
-        receivables: 'لینے ہیں',
-        payables: 'دینے ہیں',
-        newEntry: 'نیا اندراج',
-        addCustomer: 'نیا گاہک',
-        addIncome: 'آمدنی',
-        addExpense: 'اخراجات'
+        dashboard: 'ÚˆÛŒØ´ Ø¨ÙˆØ±Úˆ',
+        khata: 'Ú©Ú¾Ø§ØªÛ Ø¨Ú©',
+        rooznamcha: 'Ø±ÙˆØ²Ù†Ø§Ù…Ú†Û',
+        reports: 'Ø±Ù¾ÙˆØ±Ù¹Ø³',
+        settings: 'Ø³ÛŒÙ¹Ù†Ú¯Ø²',
+        trash: 'Ù¹Ø±ÛŒØ´',
+        cashInHand: 'Ù†Ù‚Ø¯ÛŒ',
+        receivables: 'Ú©Ù„ ÙˆØµÙˆÙ„ÛŒ',
+        payables: 'Ú©Ù„ Ø§Ø¯Ø§Ø¦ÛŒÚ¯ÛŒ',
+        newEntry: 'Ù†ÛŒØ§ Ø§Ù†Ø¯Ø±Ø§Ø¬',
+        addCustomer: 'Ú¯Ø§ÛÚ© Ø´Ø§Ù…Ù„ Ú©Ø±ÛŒÚº',
+        addIncome: 'Ø¢Ù…Ø¯Ù†ÛŒ Ø´Ø§Ù…Ù„ Ú©Ø±ÛŒÚº',
+        addExpense: 'Ø§Ø®Ø±Ø§Ø¬Ø§Øª Ø´Ø§Ù…Ù„ Ú©Ø±ÛŒÚº'
     }
 };
 
@@ -385,20 +385,36 @@ class DataManager {
     applyLanguage() {
         const lang = this.data.settings.language || 'en';
         const t = translations[lang];
+        
+        // Update Sidebar
+        document.querySelector('[data-view="dashboard"] span').innerText = t.dashboard;
+        document.querySelector('[data-view="khata"] span').innerText = t.khata;
+        document.querySelector('[data-view="rooznamcha"] span').innerText = t.rooznamcha;
+        document.querySelector('[data-view="reports"] span').innerText = t.reports;
+        document.querySelector('[data-view="settings"] span').innerText = t.settings;
+        const trashNav = document.querySelector('[data-view="trash"] span');
+        if (trashNav) trashNav.innerText = t.trash;
 
-        // Keep bilingual sidebar as designed — only update if span has no <small>
-        document.querySelectorAll('.nav-link[data-view]').forEach((link) => {
-            const span = link.querySelector('span');
-            const key = link.getAttribute('data-view');
-            if (!span || span.querySelector('small') || !t[key]) return;
-            span.textContent = t[key];
-        });
-
+        // Update Dashboard Stats Labels
         const statsCards = document.querySelectorAll('.stat-card .label');
         if (statsCards[0]) statsCards[0].innerText = t.cashInHand;
         if (statsCards[1]) statsCards[1].innerText = t.receivables;
         if (statsCards[2]) statsCards[2].innerText = t.payables;
 
+        // Update Buttons
+        const newEntryBtn = document.querySelector('.btn-add-transaction span');
+        if (newEntryBtn) newEntryBtn.innerText = t.newEntry;
+
+        const addCustomerBtn = document.querySelector('.btn-add-customer span');
+        if (addCustomerBtn) addCustomerBtn.innerText = t.addCustomer;
+
+        const addIncomeBtn = document.querySelector('.btn-add-income span');
+        if (addIncomeBtn) addIncomeBtn.innerText = t.addIncome;
+
+        const addExpenseBtn = document.querySelector('.btn-add-expense span');
+        if (addExpenseBtn) addExpenseBtn.innerText = t.addExpense;
+
+        // Update Body Class for RTL support if Urdu
         if (lang === 'ur') {
             document.body.classList.add('rtl');
         } else {
@@ -1038,47 +1054,27 @@ function printRoozReport(dateFilter) {
 /**
  * Navigation & View Management
  */
-function goToView(targetView) {
-    if (!targetView) return;
+function setupNavigation() {
     const navLinks = document.querySelectorAll('.nav-link');
     const views = document.querySelectorAll('.view');
-    const mobBtns = document.querySelectorAll('.mob-nav-btn[data-go-view]');
 
-    navLinks.forEach((l) => {
-        l.classList.toggle('active', l.getAttribute('data-view') === targetView);
-    });
-    mobBtns.forEach((b) => {
-        b.classList.toggle('active', b.getAttribute('data-go-view') === targetView);
-    });
-    views.forEach((view) => {
-        view.classList.toggle('active', view.id === `${targetView}-view`);
-    });
-
-    document.body.classList.remove('sidebar-open');
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.getElementById('sidebar-overlay');
-    if (sidebar) sidebar.classList.remove('open');
-    if (overlay) {
-        overlay.hidden = true;
-        overlay.setAttribute('aria-hidden', 'true');
-    }
-    updateUI();
-}
-
-function setupNavigation() {
-    document.querySelectorAll('.nav-link').forEach((link) => {
+    navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
-            goToView(link.getAttribute('data-view'));
-        });
-    });
+            const targetView = link.getAttribute('data-view');
+            
+            navLinks.forEach(l => l.classList.remove('active'));
+            link.classList.add('active');
 
-    document.querySelectorAll('[data-go-view]').forEach((el) => {
-        el.addEventListener('click', (e) => {
-            // Don't steal clicks from add-transaction / add-customer buttons
-            if (el.classList.contains('btn-add-transaction') || el.classList.contains('btn-add-customer')) return;
-            e.preventDefault();
-            goToView(el.getAttribute('data-go-view'));
+            views.forEach(view => {
+                view.classList.remove('active');
+                if (view.id === `${targetView}-view`) {
+                    view.classList.add('active');
+                }
+            });
+
+            console.log(`Switched to view: ${targetView}`);
+            updateUI();
         });
     });
 }
