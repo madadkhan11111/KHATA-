@@ -1,13 +1,20 @@
 /**
- * Site + GitHub Cloud configuration.
- * Website: GitHub Pages
- * User data: private GitHub Gists (after Sign in with GitHub)
+ * Site + Firebase cloud configuration.
+ * Website: GitHub Pages / Vercel
+ * App data: Firebase Auth + Firestore (private per user)
  */
 window.KHATA_CONFIG = {
   websiteUrl: "https://madadkhan11111.github.io/KHATA-/",
   desktopDownloadUrl: null,
 
-  // Create at https://github.com/settings/developers → OAuth Apps → New
-  // Enable Device Flow, then paste Client ID here:
-  githubOAuthClientId: "YOUR_GITHUB_OAUTH_CLIENT_ID"
+  // Paste Firebase web config from:
+  // Firebase Console → Project settings → Your apps → SDK setup
+  firebase: {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  }
 };

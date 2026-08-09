@@ -21,6 +21,9 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 </head>
 <body class="dark-theme">
     <noscript>
@@ -30,13 +33,28 @@
     <div id="auth-screen" class="auth-screen">
         <div class="auth-card" id="auth-card">
             <div class="auth-brand"><i class="fas fa-book-bookmark"></i><span>KhataPro</span></div>
-            <h1 id="auth-title">Sign in to KhataPro</h1>
-            <p class="auth-sub" id="auth-subtitle">Your data is stored privately in GitHub Cloud. Continue with GitHub to use the app on any device.</p>
+            <h1 id="auth-title">Welcome back</h1>
+            <p class="auth-sub" id="auth-subtitle">Log in — your Khata data syncs privately to Firebase Cloud.</p>
+            <div class="form-group">
+                <label for="auth-email">Email</label>
+                <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label for="auth-password">Password</label>
+                <input type="password" id="auth-password" placeholder="Min 6 characters" autocomplete="current-password">
+            </div>
             <p id="auth-message" class="auth-message"></p>
-            <button type="button" class="btn btn-primary" id="btn-auth-github" style="width:100%; justify-content:center;">
-                <i class="fab fa-github"></i> Continue with GitHub
+            <button type="button" class="btn btn-primary" id="btn-auth-login" style="width:100%; justify-content:center;">
+                <i class="fas fa-sign-in-alt"></i> Log In
             </button>
-            <p class="auth-switch" id="auth-switch-signup">Free for shops worldwide — each account’s data stays private on GitHub.</p>
+            <button type="button" class="btn btn-primary" id="btn-auth-signup" style="width:100%; justify-content:center;" hidden>
+                <i class="fas fa-user-plus"></i> Create Account
+            </button>
+            <button type="button" class="btn btn-secondary" id="btn-auth-google" style="width:100%; justify-content:center; margin-top:0.75rem;">
+                <i class="fab fa-google"></i> Continue with Google
+            </button>
+            <p class="auth-switch" id="auth-switch-signup">New here? <a href="#" id="link-show-signup">Create a free account</a></p>
+            <p class="auth-switch" id="auth-switch-login" hidden>Already have an account? <a href="#" id="link-show-login">Log in</a></p>
         </div>
     </div>
 
@@ -483,15 +501,15 @@
 
                         <div class="content-card">
                             <div class="card-header">
-                                <h3>Your GitHub Cloud Account</h3>
+                                <h3>Your Firebase Cloud Account</h3>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 1rem;">
                                 <p class="text-muted" style="font-size: 0.9rem;">
-                                    No manual backup folder. Your Khata data syncs automatically to a <strong>private GitHub Gist</strong> for your account.
+                                    No manual backup folder. Your Khata data syncs automatically to <strong>Firebase Cloud</strong> for your account.
                                 </p>
                                 <div id="account-panel" style="padding: 0.75rem; border-radius: var(--radius-md); background: var(--bg-main); border: 1px solid var(--border);">
                                     <div style="font-weight: 600;" id="account-user-email">Not signed in</div>
-                                    <div class="text-muted" style="font-size: 0.8rem; margin-top: 0.35rem;" id="account-sync-status">Sign in with GitHub to sync.</div>
+                                    <div class="text-muted" style="font-size: 0.8rem; margin-top: 0.35rem;" id="account-sync-status">Sign in to sync with Firebase.</div>
                                 </div>
                                 <button type="button" class="btn btn-success" id="btn-cloud-sync-now" style="width: 100%; justify-content: center;">
                                     <i class="fas fa-cloud-upload-alt"></i> Sync Now
