@@ -1,5 +1,5 @@
 :root {
-    /* Ledger ink + teal â€” clear brand, not purple */
+    /* Ledger ink + teal — clear brand, not purple */
     --primary-h: 178;
     --primary-s: 72%;
     --primary-l: 32%;
@@ -1611,3 +1611,166 @@ body.rtl .form-row {
     }
 }
 
+
+/* ===== App polish v1.3 ===== */
+.view-eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--primary);
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+}
+
+.view-header h2 {
+    font-size: clamp(1.7rem, 3vw, 2.15rem);
+    background: linear-gradient(120deg, var(--text-main) 40%, var(--primary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.stat-card {
+    border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+    background:
+        linear-gradient(160deg, color-mix(in srgb, var(--bg-card) 92%, transparent), var(--bg-card)),
+        var(--bg-card);
+}
+
+.stat-info h3 {
+    font-family: var(--font-display);
+    font-size: 1.65rem;
+    letter-spacing: -0.02em;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.data-table th {
+    background: color-mix(in srgb, var(--primary) 8%, var(--bg-card));
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 700;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.data-table td {
+    padding: 0.95rem 1rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+    vertical-align: middle;
+}
+
+.data-table tbody tr {
+    transition: background 0.2s ease;
+}
+
+.data-table tbody tr:hover {
+    background: color-mix(in srgb, var(--primary) 7%, transparent);
+}
+
+.customer-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.9rem 0.35rem;
+    border-bottom: 1px solid var(--border);
+    border-radius: 10px;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.customer-item:hover {
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    transform: translateX(2px);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2.5rem 1.25rem;
+    color: var(--text-muted);
+    border: 1px dashed color-mix(in srgb, var(--primary) 35%, var(--border));
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--primary) 4%, transparent);
+}
+
+.empty-state i {
+    font-size: 1.8rem;
+    color: var(--primary);
+    margin-bottom: 0.75rem;
+    display: block;
+}
+
+.badge.income {
+    background: rgba(16, 185, 129, 0.14);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    border-radius: 999px;
+    padding: 0.2rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.badge.expense {
+    background: rgba(225, 29, 72, 0.12);
+    color: #e11d48;
+    border: 1px solid rgba(225, 29, 72, 0.22);
+    border-radius: 999px;
+    padding: 0.2rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.content-card {
+    padding: 1.35rem 1.4rem;
+}
+
+.modal-card {
+    border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
+    box-shadow: var(--shadow-lg);
+    animation: rise-in 0.35s ease both;
+}
+
+.search-bar input {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+}
+
+.top-bar {
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+    margin-bottom: 0.35rem;
+}
+
+.sidebar .logo span {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+}
+
+.nav-link.active {
+    position: relative;
+}
+
+.nav-link.active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 20%;
+    bottom: 20%;
+    width: 3px;
+    border-radius: 999px;
+    background: #b8892a;
+}
+
+@media (max-width: 768px) {
+    .view-header h2 {
+        font-size: 1.55rem;
+    }
+    .stat-info h3 {
+        font-size: 1.35rem;
+    }
+}
