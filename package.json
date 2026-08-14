@@ -7,7 +7,8 @@
     "start": "electron .",
     "web": "node server.js",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "vercel": "vercel --prod"
   },
   "author": "JD",
   "license": "ISC",

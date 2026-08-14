@@ -4,9 +4,9 @@
   "description": "Professional Khata Book and Rooznamcha for shops and small businesses.",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#6366f1",
-  "orientation": "any",
+  "background_color": "#081413",
+  "theme_color": "#0d7377",
+  "orientation": "portrait-primary",
   "icons": [
     {
       "src": "favicon.svg",

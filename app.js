@@ -16,7 +16,10 @@ const translations = {
         newEntry: 'New Entry',
         addCustomer: 'Add Customer',
         addIncome: 'Add Income',
-        addExpense: 'Add Expense'
+        addExpense: 'Add Expense',
+        home: 'Home',
+        dailyShort: 'Daily',
+        menu: 'Menu'
     },
     ur: {
         dashboard: 'ÚˆÛŒØ´ Ø¨ÙˆØ±Úˆ',
@@ -31,7 +34,10 @@ const translations = {
         newEntry: 'Ù†ÛŒØ§ Ø§Ù†Ø¯Ø±Ø§Ø¬',
         addCustomer: 'Ú¯Ø§ÛÚ© Ø´Ø§Ù…Ù„ Ú©Ø±ÛŒÚº',
         addIncome: 'Ø¢Ù…Ø¯Ù†ÛŒ Ø´Ø§Ù…Ù„ Ú©Ø±ÛŒÚº',
-        addExpense: 'Ø§Ø®Ø±Ø§Ø¬Ø§Øª Ø´Ø§Ù…Ù„ Ú©Ø±ÛŒÚº'
+        addExpense: 'Ø§Ø®Ø±Ø§Ø¬Ø§Øª Ø´Ø§Ù…Ù„ Ú©Ø±ÛŒÚº',
+        home: 'Home',
+        dailyShort: 'Daily',
+        menu: 'Menu'
     }
 };
 
@@ -386,14 +392,26 @@ class DataManager {
         const lang = this.data.settings.language || 'en';
         const t = translations[lang];
         
-        // Update Sidebar
-        document.querySelector('[data-view="dashboard"] span').innerText = t.dashboard;
-        document.querySelector('[data-view="khata"] span').innerText = t.khata;
-        document.querySelector('[data-view="rooznamcha"] span').innerText = t.rooznamcha;
-        document.querySelector('[data-view="reports"] span').innerText = t.reports;
-        document.querySelector('[data-view="settings"] span').innerText = t.settings;
-        const trashNav = document.querySelector('[data-view="trash"] span');
-        if (trashNav) trashNav.innerText = t.trash;
+        // Update Sidebar + bottom nav
+        const setNavText = (view, text) => {
+            document.querySelectorAll(`.nav-link[data-view="${view}"] span`).forEach(el => { el.innerText = text; });
+        };
+        setNavText('dashboard', t.dashboard);
+        setNavText('khata', t.khata);
+        setNavText('rooznamcha', t.rooznamcha);
+        setNavText('reports', t.reports);
+        setNavText('settings', t.settings);
+        setNavText('trash', t.trash);
+
+        const setBottomText = (view, text) => {
+            document.querySelectorAll(`.bottom-nav-item[data-view="${view}"] span`).forEach(el => { el.innerText = text; });
+        };
+        setBottomText('dashboard', t.home || 'Home');
+        setBottomText('khata', t.khata);
+        setBottomText('rooznamcha', t.dailyShort || t.rooznamcha);
+        setBottomText('reports', t.reports);
+        const menuSpan = document.querySelector('#btn-bottom-menu span');
+        if (menuSpan) menuSpan.innerText = t.menu || 'Menu';
 
         // Update Dashboard Stats Labels
         const statsCards = document.querySelectorAll('.stat-card .label');
@@ -579,6 +597,7 @@ async function initApp() {
     setupNavigation();
     setupThemeToggle();
     setupMobileNav();
+    setupMobileFab();
     setupModalHandlers();
     setupFilterHandlers();
     setupSearchHandlers();
@@ -860,41 +879,37 @@ function setupFilterHandlers() {
 
 function setupMobileNav() {
     const menuBtn = document.getElementById('btn-mobile-menu');
-    const sidebar = document.querySelector('.sidebar');
     const overlay = document.getElementById('sidebar-overlay');
-    if (!menuBtn || !sidebar) return;
 
-    const closeSidebar = () => {
-        sidebar.classList.remove('open');
-        if (overlay) {
-            overlay.hidden = true;
-            overlay.setAttribute('aria-hidden', 'true');
-        }
-        document.body.classList.remove('sidebar-open');
-    };
-
-    const openSidebar = () => {
-        sidebar.classList.add('open');
-        if (overlay) {
-            overlay.hidden = false;
-            overlay.setAttribute('aria-hidden', 'false');
-        }
-        document.body.classList.add('sidebar-open');
-    };
-
-    menuBtn.addEventListener('click', () => {
-        if (sidebar.classList.contains('open')) closeSidebar();
+    menuBtn?.addEventListener('click', () => {
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar?.classList.contains('open')) closeSidebar();
         else openSidebar();
     });
-
+    document.getElementById('btn-close-sidebar')?.addEventListener('click', closeSidebar);
     overlay?.addEventListener('click', closeSidebar);
-    document.querySelectorAll('.nav-link').forEach(link => {
-        link.addEventListener('click', () => {
-            if (window.innerWidth <= 768) closeSidebar();
-        });
-    });
     window.addEventListener('resize', () => {
-        if (window.innerWidth > 768) closeSidebar();
+        if (!isMobileApp()) {
+            closeSidebar();
+            closeFabMenu();
+        }
+    });
+
+    if (window.visualViewport) {
+        const onViewport = () => {
+            const keyboardOpen = window.innerHeight - window.visualViewport.height > 140;
+            document.body.classList.toggle('keyboard-open', keyboardOpen);
+        };
+        window.visualViewport.addEventListener('resize', onViewport);
+        window.visualViewport.addEventListener('scroll', onViewport);
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeSidebar();
+            closeFabMenu();
+            closeModal();
+        }
     });
 }
 
@@ -1054,28 +1069,97 @@ function printRoozReport(dateFilter) {
 /**
  * Navigation & View Management
  */
-function setupNavigation() {
-    const navLinks = document.querySelectorAll('.nav-link');
-    const views = document.querySelectorAll('.view');
+function closeSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    sidebar?.classList.remove('open');
+    if (overlay) {
+        overlay.hidden = true;
+        overlay.setAttribute('aria-hidden', 'true');
+    }
+    document.body.classList.remove('sidebar-open');
+}
 
-    navLinks.forEach(link => {
+function openSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    sidebar?.classList.add('open');
+    if (overlay) {
+        overlay.hidden = false;
+        overlay.setAttribute('aria-hidden', 'false');
+    }
+    document.body.classList.add('sidebar-open');
+}
+
+function isMobileApp() {
+    return window.matchMedia('(max-width: 768px)').matches;
+}
+
+function switchView(targetView) {
+    if (!targetView || targetView === 'menu') return;
+    const views = document.querySelectorAll('.view');
+    document.querySelectorAll('.nav-link').forEach(l => {
+        l.classList.toggle('active', l.getAttribute('data-view') === targetView);
+    });
+    document.querySelectorAll('.bottom-nav-item').forEach(l => {
+        l.classList.toggle('active', l.getAttribute('data-view') === targetView);
+    });
+    views.forEach(view => {
+        view.classList.toggle('active', view.id === `${targetView}-view`);
+    });
+    document.querySelector('.main-content')?.scrollTo({ top: 0, behavior: 'auto' });
+    closeFabMenu();
+    if (isMobileApp()) closeSidebar();
+    updateUI();
+}
+
+function setupNavigation() {
+    document.querySelectorAll('.nav-link, .bottom-nav-item').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const targetView = link.getAttribute('data-view');
-            
-            navLinks.forEach(l => l.classList.remove('active'));
-            link.classList.add('active');
-
-            views.forEach(view => {
-                view.classList.remove('active');
-                if (view.id === `${targetView}-view`) {
-                    view.classList.add('active');
-                }
-            });
-
-            console.log(`Switched to view: ${targetView}`);
-            updateUI();
+            if (link.id === 'btn-bottom-menu' || targetView === 'menu') {
+                const sidebar = document.querySelector('.sidebar');
+                if (sidebar?.classList.contains('open')) closeSidebar();
+                else openSidebar();
+                return;
+            }
+            switchView(targetView);
         });
+    });
+}
+
+function closeFabMenu() {
+    const wrap = document.getElementById('mobile-fab-wrap');
+    const backdrop = document.getElementById('fab-backdrop');
+    const fab = document.getElementById('btn-mobile-fab');
+    wrap?.classList.remove('open');
+    if (backdrop) {
+        backdrop.hidden = true;
+        backdrop.classList.remove('show');
+    }
+    if (fab) fab.setAttribute('aria-expanded', 'false');
+}
+
+function setupMobileFab() {
+    const fab = document.getElementById('btn-mobile-fab');
+    const wrap = document.getElementById('mobile-fab-wrap');
+    const backdrop = document.getElementById('fab-backdrop');
+    if (!fab || !wrap) return;
+
+    fab.addEventListener('click', () => {
+        const opening = !wrap.classList.contains('open');
+        wrap.classList.toggle('open', opening);
+        fab.setAttribute('aria-expanded', opening ? 'true' : 'false');
+        if (backdrop) {
+            backdrop.hidden = !opening;
+            backdrop.classList.toggle('show', opening);
+        }
+    });
+
+    backdrop?.addEventListener('click', closeFabMenu);
+    wrap.querySelectorAll('.fab-action').forEach(btn => {
+        btn.addEventListener('click', closeFabMenu);
     });
 }
 
@@ -1111,6 +1195,28 @@ function setupModalHandlers() {
 
     // Button Listeners
     document.addEventListener('click', (e) => {
+        const interactive = e.target.closest('button, a, input, select, textarea, .table-actions');
+        if (!interactive) {
+            const miniCust = e.target.closest('.customer-item');
+            if (miniCust?.dataset.id) {
+                openModal('Customer Ledger Statement', 'view-ledger');
+                renderLedgerStatement(miniCust.dataset.id);
+                return;
+            }
+            const customerRow = e.target.closest('tr.customer-row');
+            if (customerRow?.dataset.id) {
+                openModal('Customer Ledger Statement', 'view-ledger');
+                renderLedgerStatement(customerRow.dataset.id);
+                return;
+            }
+            const entryRow = e.target.closest('tr.entry-row');
+            if (entryRow?.dataset.id) {
+                const entry = db.data.rooznamcha.find(en => en.id == entryRow.dataset.id);
+                if (entry) openModal(`Edit Transaction #${entry.transactionNo}`, 'edit-entry', entry);
+                return;
+            }
+        }
+
         const target = e.target.closest('button');
         if (!target) return;
 
@@ -1143,7 +1249,7 @@ function setupModalHandlers() {
         } else if (target.closest('.btn-whatsapp-direct')) {
             const customerId = target.closest('.btn-whatsapp-direct').dataset.id;
             shareOnWhatsApp(customerId);
-        } else if (target.id === 'btn-print-rooznamcha') {
+        } else if (target.id === 'btn-print-rooznamcha' || target.id === 'btn-print-rooznamcha-mobile') {
             const dateFilter = document.getElementById('rooznamcha-date-filter')?.value || new Date().toISOString().split('T')[0];
             printRoozReport(dateFilter);
         } else if (target.closest('.btn-print-direct')) {
@@ -1228,15 +1334,9 @@ function setupModalHandlers() {
         }
     });
 
-    closeBtn?.addEventListener('click', () => {
-        modal.classList.remove('active');
-        document.body.classList.remove('modal-open');
-    });
+    closeBtn?.addEventListener('click', closeModal);
     window.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.classList.remove('active');
-            document.body.classList.remove('modal-open');
-        }
+        if (e.target === modal) closeModal();
     });
 
     mainForm.addEventListener('submit', (e) => {
@@ -1244,8 +1344,7 @@ function setupModalHandlers() {
         const success = handleFormSubmit(new FormData(mainForm));
         if (success === false) return; // Validation failed
         
-        modal.classList.remove('active');
-        document.body.classList.remove('modal-open');
+        closeModal();
         updateUI();
     });
 
@@ -1265,10 +1364,18 @@ function setupModalHandlers() {
     });
 }
 
+function closeModal() {
+    const modal = document.getElementById('modal-container');
+    modal?.classList.remove('active');
+    document.body.classList.remove('modal-open');
+}
+
 function openModal(title, type, data = null) {
     const modal = document.getElementById('modal-container');
     const modalTitle = document.getElementById('modal-title');
     const form = document.getElementById('main-form');
+    closeFabMenu();
+    closeSidebar();
     
     modalTitle.innerText = title;
     form.dataset.type = type;
@@ -1288,11 +1395,11 @@ function renderForm(type, data = null) {
             return `
                 <div class="form-group">
                     <label>Customer Name</label>
-                    <input type="text" name="name" required placeholder="Enter name" value="${data ? data.name : ''}">
+                    <input type="text" name="name" autocomplete="name" required placeholder="Enter name" value="${data ? data.name : ''}">
                 </div>
                 <div class="form-group">
                     <label>Phone Number</label>
-                    <input type="text" name="phone" required placeholder="03xx-xxxxxxx" value="${data ? data.phone : ''}">
+                    <input type="tel" name="phone" inputmode="numeric" autocomplete="tel" required placeholder="03xx-xxxxxxx" value="${data ? data.phone : ''}">
                 </div>
                 ${!isCustEdit ? `
                 <div class="form-group highlight">
@@ -1321,7 +1428,7 @@ function renderForm(type, data = null) {
                 <div class="form-row">
                     <div class="form-group flex-1">
                         <label>Transaction Amount</label>
-                        <input type="number" name="amount" required placeholder="0.00" autoFocus value="${data ? data.amount : ''}">
+                        <input type="number" name="amount" inputmode="decimal" step="0.01" min="0" required placeholder="0.00" autoFocus value="${data ? data.amount : ''}">
                     </div>
                     <div class="form-group flex-1">
                         <label>Category</label>
@@ -1364,7 +1471,7 @@ function renderForm(type, data = null) {
                 </div>
                 <div class="form-group">
                     <label>Amount</label>
-                    <input type="number" name="amount" required>
+                    <input type="number" name="amount" inputmode="decimal" step="0.01" min="0" required>
                 </div>
                 <div class="form-group">
                     <label>Description</label>
@@ -1583,10 +1690,10 @@ function updateTrashList() {
 
         return `
             <tr>
-                <td><span class="badge ${item.type === 'customer' ? 'badge-info' : 'badge-warning'}">${item.type.toUpperCase()}</span></td>
-                <td>${details}</td>
-                <td>${new Date(item.deletedAt).toLocaleString()}</td>
-                <td class="text-right">
+                <td class="cell-sub"><span class="badge ${item.type === 'customer' ? 'badge-info' : 'badge-warning'}">${item.type.toUpperCase()}</span></td>
+                <td class="cell-title">${details}</td>
+                <td class="cell-meta">${new Date(item.deletedAt).toLocaleString()}</td>
+                <td class="cell-actions text-right">
                     <button class="btn btn-icon btn-restore-trash" data-id="${item.id}" title="Restore">
                         <i class="fas fa-undo"></i>
                     </button>
@@ -1596,7 +1703,7 @@ function updateTrashList() {
     }).join('');
 
     if (db.data.trash.length === 0) {
-        trashList.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-muted);">Trash is empty</td></tr>';
+        trashList.innerHTML = '<tr class="empty-row"><td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-muted);">Trash is empty</td></tr>';
     }
 }
 
@@ -1683,12 +1790,12 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
     const renderRoozRow = (t) => {
         const customer = t.customerId ? db.data.customers.find(c => c.id === t.customerId) : null;
         return `
-            <tr>
-                <td>
+            <tr class="entry-row" data-id="${t.id}">
+                <td class="cell-meta">
                     <div style="font-size: 0.75rem; color: var(--text-muted);">#${t.transactionNo || 'N/A'} (Pg ${t.pageNo || '1'})</div>
                     ${new Date(t.date).toLocaleString()}
                 </td>
-                <td>
+                <td class="cell-title">
                     <div>${t.description || 'No description'}</div>
                     ${customer ? `
                         <div style="margin-top: 5px;">
@@ -1697,12 +1804,12 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
                         </div>
                     ` : ''}
                 </td>
-                <td><span class="badge ${t.type}">${t.category}</span></td>
-                <td class="${t.type === 'income' ? 'text-success' : 'text-danger'}">
+                <td class="cell-sub"><span class="badge ${t.type}">${t.category}</span></td>
+                <td class="cell-amount ${t.type === 'income' ? 'text-success' : 'text-danger'}">
                     ${t.type === 'income' ? '+' : '-'} ${currency} ${t.amount.toLocaleString()}
                 </td>
-                <td>${t.type}</td>
-                <td class="no-print">
+                <td class="cell-muted">${t.type}</td>
+                <td class="cell-actions no-print">
                     <div class="table-actions">
                         <button class="btn-icon btn-edit-entry" data-id="${t.id}" title="Edit Transaction">
                             <i class="fas fa-edit"></i>
@@ -1719,14 +1826,14 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
     const renderRecentRow = (t) => {
         const customer = t.customerId ? db.data.customers.find(c => c.id === t.customerId) : null;
         return `
-            <tr>
-                <td>${new Date(t.date).toLocaleDateString()}</td>
-                <td>
+            <tr class="entry-row" data-id="${t.id}">
+                <td class="cell-meta">${new Date(t.date).toLocaleDateString()}</td>
+                <td class="cell-title">
                     <div>${t.description || 'No description'}</div>
                     ${customer ? `<div style="margin-top: 5px; color: var(--primary); font-size: 0.85rem;">${customer.name}</div>` : ''}
                 </td>
-                <td><span class="badge ${t.type}">${t.category}</span></td>
-                <td class="${t.type === 'income' ? 'text-success' : 'text-danger'}">
+                <td class="cell-sub"><span class="badge ${t.type}">${t.category}</span></td>
+                <td class="cell-amount ${t.type === 'income' ? 'text-success' : 'text-danger'}">
                     ${t.type === 'income' ? '+' : '-'} ${currency} ${t.amount.toLocaleString()}
                 </td>
             </tr>
@@ -1734,10 +1841,10 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
     };
 
     if (recentList) {
-        recentList.innerHTML = recentTransactions.length === 0 ? '<tr><td colspan="4" class="text-center">No recent transactions</td></tr>' : recentTransactions.slice(0, 5).map(renderRecentRow).join('');
+        recentList.innerHTML = recentTransactions.length === 0 ? '<tr class="empty-row"><td colspan="4" class="text-center">No recent transactions</td></tr>' : recentTransactions.slice(0, 5).map(renderRecentRow).join('');
     }
     if (rooznamchaList) {
-        rooznamchaList.innerHTML = roozViewTransactions.length === 0 ? '<tr><td colspan="6" class="text-center">No transactions recorded</td></tr>' : roozViewTransactions.map(renderRoozRow).join('');
+        rooznamchaList.innerHTML = roozViewTransactions.length === 0 ? '<tr class="empty-row"><td colspan="6" class="text-center">No transactions recorded</td></tr>' : roozViewTransactions.map(renderRoozRow).join('');
     }
 }
 
@@ -1753,7 +1860,7 @@ function updateCustomerLists() {
     if (topCustomers) {
         const top = customers.slice(0, 5);
         topCustomers.innerHTML = top.length === 0 ? '<p class="empty-state">No customers added yet.</p>' : top.map(c => `
-            <div class="customer-item">
+            <div class="customer-item" data-id="${c.id}" role="button" tabindex="0">
                 <div class="cust-info">
                     <span class="cust-name">${c.name}</span>
                     <span class="cust-phone">${c.phone}</span>
@@ -1766,18 +1873,23 @@ function updateCustomerLists() {
     }
 
     if (khataList) {
-        khataList.innerHTML = customers.length === 0 ? '<tr><td colspan="5" class="text-center">No customers found</td></tr>' : customers.map(c => `
-            <tr>
-                <td><strong>${c.khataNo}</strong></td>
-                <td>${c.name}</td>
-                <td>${c.phone}</td>
-                <td>${c.transactions.length > 0 ? new Date(c.transactions[c.transactions.length-1].date).toLocaleDateString() : 'N/A'}</td>
-                <td class="${c.balance >= 0 ? 'text-success' : 'text-danger'}">
-                    ${currency} ${Math.abs(c.balance).toLocaleString()} ${c.balance >= 0 ? '(THEY WILL GIVE ME)' : '(I WILL GIVE THEM)'}
+        khataList.innerHTML = customers.length === 0 ? '<tr class="empty-row"><td colspan="6" class="text-center">No customers found</td></tr>' : customers.map(c => {
+            const lastDate = c.transactions.length > 0 ? new Date(c.transactions[c.transactions.length-1].date).toLocaleDateString() : 'N/A';
+            const tel = String(c.phone || '').replace(/[^0-9+]/g, '');
+            return `
+            <tr class="customer-row" data-id="${c.id}">
+                <td class="cell-muted"><strong>${c.khataNo}</strong></td>
+                <td class="cell-title">${c.name}</td>
+                <td class="cell-sub">${c.phone}</td>
+                <td class="cell-meta"><span class="mobile-inline">Khata #${c.khataNo} · </span>${lastDate}</td>
+                <td class="cell-amount ${c.balance >= 0 ? 'text-success' : 'text-danger'}">
+                    ${currency} ${Math.abs(c.balance).toLocaleString()}
+                    <div class="cell-balance-hint">${c.balance >= 0 ? 'They will give' : 'You will give'}</div>
                 </td>
-                <td>
+                <td class="cell-actions">
                     <div class="table-actions">
                         <button class="btn-text btn-view-ledger" data-id="${c.id}" title="View Ledger">View</button>
+                        ${tel ? `<a class="btn-icon btn-call" href="tel:${tel}" title="Call ${c.name}"><i class="fas fa-phone"></i></a>` : ''}
                         <button class="btn-icon btn-whatsapp-direct no-print" data-id="${c.id}" title="Share on WhatsApp">
                             <i class="fab fa-whatsapp"></i>
                         </button>
@@ -1793,7 +1905,8 @@ function updateCustomerLists() {
                     </div>
                 </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
     }
 }
 

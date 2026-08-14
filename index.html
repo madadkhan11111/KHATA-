@@ -2,13 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5">
     <title>KhataBook Pro - Premium Ledger & Daily Cash Book</title>
     <meta name="description" content="Professional Khata Book and Rooznamcha with free cloud accounts for shops worldwide.">
     <meta name="theme-color" content="#0d7377">
-    <meta name="application-version" content="1.1.0">
+    <meta name="application-version" content="1.6.0">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="KhataPro">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <link rel="apple-touch-icon" href="favicon.svg">
     <meta property="og:title" content="KhataBook Pro - Ledger & Daily Cash Book">
     <meta property="og:description" content="Create a free account and manage Khata & Rooznamcha from any device.">
     <meta property="og:type" content="website">
@@ -18,7 +22,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.5.0">
+    <link rel="stylesheet" href="style.css?v=1.6.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -70,6 +74,9 @@
                     <i class="fas fa-book-bookmark"></i>
                     <span>KhataPro</span>
                 </div>
+                <button type="button" id="btn-close-sidebar" class="btn-icon mobile-sidebar-close" aria-label="Close menu">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             <nav class="sidebar-nav">
                 <a href="#" class="nav-link active" data-view="dashboard">
@@ -135,9 +142,9 @@
                 </button>
                 <div class="search-bar">
                     <i class="fas fa-search"></i>
-                    <input type="text" placeholder="Search transactions, customers...">
+                    <input type="search" id="global-search" placeholder="Search customers or entries..." enterkeyhint="search" autocomplete="off">
                 </div>
-                <div class="top-actions">
+                <div class="top-actions hide-on-mobile">
                     <button type="button" class="btn btn-logout" id="btn-auth-logout" title="Log out of your account">
                         <i class="fas fa-sign-out-alt"></i>
                         <span>Log Out</span>
@@ -150,11 +157,11 @@
                 <section id="dashboard-view" class="view active">
                     <div class="view-header">
                         <div class="header-main">
-                            <p class="view-eyebrow">Your cloud ledger</p>
+                            <p class="view-eyebrow hide-on-mobile">Your cloud ledger</p>
                             <h2>Dashboard</h2>
-                            <p>Cash, khata, and daily book — saved for you after every change.</p>
+                            <p class="hide-on-mobile">Cash, khata, and daily book — saved for you after every change.</p>
                         </div>
-                        <div class="header-actions">
+                        <div class="header-actions hide-on-mobile">
                             <button class="btn btn-primary btn-add-transaction">
                                 <i class="fas fa-plus"></i>
                                 <span>New Entry</span>
@@ -274,10 +281,10 @@
                 <section id="khata-view" class="view">
                     <div class="view-header">
                         <div class="header-main">
-                            <h2>Khata Management</h2>
-                            <p>Manage your customer credit and payments.</p>
+                            <h2>Khata</h2>
+                            <p class="hide-on-mobile">Manage your customer credit and payments.</p>
                         </div>
-                        <button class="btn btn-primary btn-add-customer">
+                        <button class="btn btn-primary btn-add-customer hide-on-mobile">
                             <i class="fas fa-user-plus"></i>
                             <span>Add Customer</span>
                         </button>
@@ -313,10 +320,10 @@
                 <section id="rooznamcha-view" class="view">
                     <div class="view-header">
                         <div class="header-main">
-                            <h2>Daily Book (Rooznamcha)</h2>
-                            <p>Record all daily cash income and expenses.</p>
+                            <h2>Daily Book</h2>
+                            <p class="hide-on-mobile">Record all daily cash income and expenses.</p>
                         </div>
-                        <div class="header-actions no-print">
+                        <div class="header-actions no-print hide-on-mobile">
                             <button class="btn btn-secondary" id="btn-print-rooznamcha">
                                 <i class="fas fa-print"></i>
                                 <span>Print Daily Report</span>
@@ -352,6 +359,9 @@
                             <h3>Transaction History</h3>
                             <div class="filter-group">
                                 <input type="date" id="rooznamcha-date-filter">
+                                <button type="button" class="btn-icon phone-only" id="btn-print-rooznamcha-mobile" title="Print daily report" aria-label="Print daily report">
+                                    <i class="fas fa-print"></i>
+                                </button>
                             </div>
                         </div>
                         <div class="table-responsive">
@@ -377,8 +387,8 @@
                 <section id="reports-view" class="view">
                     <div class="view-header">
                         <div class="header-main">
-                            <h2>Business Reports</h2>
-                            <p>Generate summaries and data backup.</p>
+                            <h2>Reports</h2>
+                            <p class="hide-on-mobile">Generate summaries and data backup.</p>
                         </div>
                         <div class="top-actions no-print">
                             <button class="btn btn-secondary" id="btn-export-csv">
@@ -452,8 +462,8 @@
                 <section id="trash-view" class="view">
                     <div class="view-header">
                         <div class="header-main">
-                            <h2>Trash / Deleted Items</h2>
-                            <p>Restore deleted transactions or customers</p>
+                            <h2>Trash</h2>
+                            <p class="hide-on-mobile">Restore deleted transactions or customers</p>
                         </div>
                         <button class="btn btn-danger" id="btn-empty-trash">
                             <i class="fas fa-trash-restore"></i> Empty Trash
@@ -482,7 +492,7 @@
                     <div class="view-header">
                         <div class="header-main">
                             <h2>Settings</h2>
-                            <p>Configure your shop details and preferences.</p>
+                            <p class="hide-on-mobile">Configure your shop details and preferences.</p>
                         </div>
                     </div>
 
@@ -522,6 +532,50 @@
                 </section>
             </div>
         </main>
+
+        <div class="fab-backdrop" id="fab-backdrop" hidden></div>
+        <div class="mobile-fab-wrap" id="mobile-fab-wrap">
+            <div class="fab-actions">
+                <button type="button" class="fab-action btn-add-income">
+                    <span>Income</span>
+                    <span class="fab-action-icon income"><i class="fas fa-arrow-down"></i></span>
+                </button>
+                <button type="button" class="fab-action btn-add-expense">
+                    <span>Expense</span>
+                    <span class="fab-action-icon expense"><i class="fas fa-arrow-up"></i></span>
+                </button>
+                <button type="button" class="fab-action btn-add-customer">
+                    <span>Customer</span>
+                    <span class="fab-action-icon customer"><i class="fas fa-user-plus"></i></span>
+                </button>
+            </div>
+            <button type="button" class="mobile-fab" id="btn-mobile-fab" aria-label="Add new" aria-expanded="false">
+                <i class="fas fa-plus"></i>
+            </button>
+        </div>
+
+        <nav class="bottom-nav" id="bottom-nav" aria-label="Main navigation">
+            <button type="button" class="bottom-nav-item active" data-view="dashboard">
+                <i class="fas fa-house"></i>
+                <span>Home</span>
+            </button>
+            <button type="button" class="bottom-nav-item" data-view="khata">
+                <i class="fas fa-users"></i>
+                <span>Khata</span>
+            </button>
+            <button type="button" class="bottom-nav-item" data-view="rooznamcha">
+                <i class="fas fa-book"></i>
+                <span>Daily</span>
+            </button>
+            <button type="button" class="bottom-nav-item" data-view="reports">
+                <i class="fas fa-file-invoice-dollar"></i>
+                <span>Reports</span>
+            </button>
+            <button type="button" class="bottom-nav-item" id="btn-bottom-menu" data-view="menu">
+                <i class="fas fa-bars"></i>
+                <span>Menu</span>
+            </button>
+        </nav>
     </div>
 
     <!-- Modals -->
@@ -542,8 +596,8 @@
     <!-- Print Containers -->
     <div id="ledger-print-container"></div>
 
-    <script src="site-config.js?v=1.5.0"></script>
-    <script src="cloud-auth.js?v=1.5.0"></script>
-    <script src="app.js?v=1.5.0"></script>
+    <script src="site-config.js?v=1.6.0"></script>
+    <script src="cloud-auth.js?v=1.6.0"></script>
+    <script src="app.js?v=1.6.0"></script>
 </body>
 </html>
