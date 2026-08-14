@@ -293,7 +293,7 @@ class DataManager {
     }
 
     getTodayStats() {
-        const today = new Date().toISOString().split('T')[0];
+        const today = typeof localISODate === 'function' ? localISODate() : new Date().toISOString().split('T')[0];
         return this.getFilteredStats(today, today);
     }
 
@@ -315,6 +315,15 @@ class DataManager {
     getFilteredRooznamcha(dateFilter) {
         if (!dateFilter) return [...this.data.rooznamcha].reverse();
         return this.data.rooznamcha.filter(entry => entry.date.startsWith(dateFilter)).reverse();
+    }
+
+    getRangeRooznamcha(startDate, endDate) {
+        return this.data.rooznamcha.filter(entry => {
+            const entryDate = (entry.date || '').split('T')[0];
+            if (startDate && entryDate < startDate) return false;
+            if (endDate && entryDate > endDate) return false;
+            return true;
+        }).slice().reverse();
     }
 
     getCustomerLedger(customerId) {
@@ -469,16 +478,20 @@ class DataManager {
         return JSON.stringify(this.data, null, 2);
     }
 
-    exportToCSV() {
+    exportToCSV(startDate = '', endDate = '') {
         const rows = [
             ['Date', 'Type', 'Category', 'Description', 'Amount', 'Customer', 'Transaction No']
         ];
 
-        this.data.rooznamcha.forEach(t => {
+        const list = (startDate || endDate)
+            ? this.getRangeRooznamcha(startDate, endDate)
+            : [...this.data.rooznamcha];
+
+        list.forEach(t => {
             const customer = t.customerId ? this.data.customers.find(c => c.id === t.customerId) : null;
             rows.push([
                 new Date(t.date).toLocaleString(),
-                t.type.toUpperCase(),
+                (t.type || '').toUpperCase(),
                 t.category,
                 t.description || '',
                 t.amount,
@@ -487,17 +500,20 @@ class DataManager {
             ]);
         });
 
-        let csvContent = "data:text/csv;charset=utf-8," 
+        const csvContent = "data:text/csv;charset=utf-8,"
             + rows.map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `khata_report_${new Date().toISOString().split('T')[0]}.csv`);
+        const stamp = startDate || endDate
+            ? `${startDate || 'start'}_${endDate || 'today'}`
+            : localISODate();
+        link.setAttribute("download", `khata_report_${stamp}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        showToast('CSV Report Downloaded!', 'success');
+        showToast(list.length ? `Excel downloaded (${list.length} entries)` : 'Excel downloaded (no entries in this period)', 'success');
     }
 
     importData(jsonString) {
@@ -537,6 +553,13 @@ const APP_VERSION = document.querySelector('meta[name="application-version"]')?.
 function formatMoney(amount, currency) {
     const sym = currency || db.data.settings.currency || 'Rs.';
     return `${sym} ${Number(amount || 0).toLocaleString()}`;
+}
+
+function localISODate(date = new Date()) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
 }
 
 function getCashTrendPercent() {
@@ -840,41 +863,264 @@ function setupSearchHandlers() {
 /**
  * Filter Management
  */
+function getReportDateRange() {
+    return {
+        start: document.getElementById('report-start-date')?.value || '',
+        end: document.getElementById('report-end-date')?.value || ''
+    };
+}
+
+function formatReportRangeLabel(start, end, preset) {
+    if (preset === 'today') return 'Today';
+    if (preset === 'week') return 'Last 7 days';
+    if (preset === 'month') return 'This month';
+    if (preset === 'year') return 'This year';
+    if (preset === 'all' || (!start && !end)) return 'All time';
+    const nice = (iso) => iso ? new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    if (start && end) return `${nice(start)} – ${nice(end)}`;
+    if (start) return `From ${nice(start)}`;
+    if (end) return `Until ${nice(end)}`;
+    return 'Selected period';
+}
+
+function applyReportPreset(preset) {
+    const today = new Date();
+    const startEl = document.getElementById('report-start-date');
+    const endEl = document.getElementById('report-end-date');
+    let start = '';
+    let end = localISODate(today);
+
+    if (preset === 'today') {
+        start = end;
+    } else if (preset === 'week') {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 6);
+        start = localISODate(d);
+    } else if (preset === 'month') {
+        start = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+    } else if (preset === 'year') {
+        start = `${today.getFullYear()}-01-01`;
+    } else if (preset === 'all') {
+        start = '';
+        end = '';
+    }
+
+    if (startEl) startEl.value = start;
+    if (endEl) endEl.value = end;
+    document.querySelectorAll('.preset-chip').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.preset === preset);
+    });
+    updateReportsPage(preset);
+}
+
+function updateReportsPage(preset) {
+    const rangeLabel = document.getElementById('report-range-label');
+    const catList = document.getElementById('report-category-list');
+    const khataList = document.getElementById('report-khata-list');
+    const entriesList = document.getElementById('report-entries-list');
+    const countEl = document.getElementById('report-entry-count');
+    if (!catList && !entriesList) return;
+
+    const { start, end } = getReportDateRange();
+    const activePreset = preset || document.querySelector('.preset-chip.active')?.dataset.preset || 'custom';
+    if (rangeLabel) rangeLabel.textContent = formatReportRangeLabel(start, end, activePreset);
+
+    const currency = db.data.settings.currency || 'Rs.';
+    const stats = db.getFilteredStats(start, end);
+    const entries = db.getRangeRooznamcha(start, end);
+
+    const incomeEl = document.getElementById('report-filter-income');
+    const expenseEl = document.getElementById('report-filter-expense');
+    const netEl = document.getElementById('report-filter-net');
+    if (incomeEl) incomeEl.textContent = formatMoney(stats.income, currency);
+    if (expenseEl) expenseEl.textContent = formatMoney(stats.expense, currency);
+    if (netEl) {
+        netEl.textContent = formatMoney(stats.net, currency);
+        netEl.className = `value ${stats.net >= 0 ? 'positive' : 'negative'}`;
+    }
+    if (countEl) countEl.textContent = `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}`;
+
+    const categories = {};
+    entries.forEach(t => {
+        const key = t.category || 'General';
+        if (!categories[key]) categories[key] = { income: 0, expense: 0 };
+        if (t.type === 'income') categories[key].income += t.amount;
+        else categories[key].expense += t.amount;
+    });
+    const catRows = Object.entries(categories)
+        .map(([name, v]) => ({ name, ...v, total: v.income + v.expense }))
+        .sort((a, b) => b.total - a.total);
+
+    if (catList) {
+        catList.innerHTML = catRows.length === 0
+            ? '<p class="empty-state">No entries in this period.</p>'
+            : catRows.map(c => `
+                <div class="report-cat-row">
+                    <div class="report-cat-name">${c.name}</div>
+                    <div class="report-cat-figures">
+                        <span class="text-success">+ ${formatMoney(c.income, currency)}</span>
+                        <span class="text-danger">- ${formatMoney(c.expense, currency)}</span>
+                    </div>
+                </div>
+            `).join('');
+    }
+
+    const owing = [...db.data.customers]
+        .filter(c => c.balance !== 0)
+        .sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance))
+        .slice(0, 8);
+
+    if (khataList) {
+        khataList.innerHTML = owing.length === 0
+            ? '<p class="empty-state">All khata balances are clear.</p>'
+            : owing.map(c => `
+                <div class="customer-item" data-id="${c.id}" role="button" tabindex="0">
+                    <div class="cust-info">
+                        <span class="cust-name">${c.name}</span>
+                        <span class="cust-phone">${c.balance >= 0 ? 'They will give' : 'You will give'}</span>
+                    </div>
+                    <span class="cust-balance ${c.balance >= 0 ? 'plus' : 'minus'}">
+                        ${formatMoney(Math.abs(c.balance), currency)}
+                    </span>
+                </div>
+            `).join('');
+    }
+
+    if (entriesList) {
+        entriesList.innerHTML = entries.length === 0
+            ? '<p class="empty-state">No transactions in this period.</p>'
+            : entries.map(t => {
+                const customer = t.customerId ? db.data.customers.find(c => c.id === t.customerId) : null;
+                const when = new Date(t.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+                return `
+                    <button type="button" class="report-entry ${t.type}" data-id="${t.id}">
+                        <div class="report-entry-main">
+                            <strong>${t.description || t.category || 'Entry'}</strong>
+                            <small>${when}${customer ? ` · ${customer.name}` : ''} · ${t.category || ''}</small>
+                        </div>
+                        <span class="${t.type === 'income' ? 'text-success' : 'text-danger'}">
+                            ${t.type === 'income' ? '+' : '-'} ${formatMoney(t.amount, currency)}
+                        </span>
+                    </button>
+                `;
+            }).join('');
+    }
+}
+
+function printFullReport() {
+    const { start, end } = getReportDateRange();
+    const currency = db.data.settings.currency || 'Rs.';
+    const shopName = db.data.settings.shopName || 'KhataBook Pro';
+    const periodStats = db.getFilteredStats(start, end);
+    const account = db.getStats();
+    const entries = db.getRangeRooznamcha(start, end);
+    const preset = document.querySelector('.preset-chip.active')?.dataset.preset;
+    const periodLabel = formatReportRangeLabel(start, end, preset);
+    const incomeEntries = entries.filter(t => t.type === 'income');
+    const expenseEntries = entries.filter(t => t.type === 'expense');
+
+    const rowHtml = (t) => {
+        const customer = t.customerId ? db.data.customers.find(c => c.id === t.customerId) : null;
+        const khataInfo = customer ? `[${customer.khataNo}] ${customer.name}` : 'Cash';
+        return `
+            <tr>
+                <td class="small-text">${t.transactionNo || ''}</td>
+                <td>
+                    <div style="font-weight:700; font-size:0.75rem;">${khataInfo}</div>
+                    <div style="font-size:0.7rem; color:#333;">${t.description || t.category || ''}</div>
+                </td>
+                <td class="text-right">${Number(t.amount).toLocaleString()}</td>
+            </tr>
+        `;
+    };
+
+    const html = `
+        <div class="print-report strong-report">
+            <div class="print-header">
+                <h1>${shopName}</h1>
+                <h2>Business Report</h2>
+                <p>${periodLabel}</p>
+            </div>
+            <div class="print-summary-strong">
+                <div class="summary-box">
+                    <div class="summary-row"><span>They will give (Receivables):</span><span class="text-success">${formatMoney(account.totalReceivables, currency)}</span></div>
+                    <div class="summary-row"><span>You will give (Payables):</span><span class="text-danger">${formatMoney(account.totalPayables, currency)}</span></div>
+                    <div class="summary-row"><span>Cash in Hand:</span><span>${formatMoney(account.cashInHand, currency)}</span></div>
+                    <div class="summary-row"><span>Period Cash In:</span><span class="text-success">${formatMoney(periodStats.income, currency)}</span></div>
+                    <div class="summary-row"><span>Period Cash Out:</span><span class="text-danger">${formatMoney(periodStats.expense, currency)}</span></div>
+                    <div class="summary-row net-row"><span>Period Net:</span><span class="${periodStats.net >= 0 ? 'text-success' : 'text-danger'}">${formatMoney(periodStats.net, currency)}</span></div>
+                </div>
+            </div>
+            <div class="print-columns">
+                <div class="print-column">
+                    <div class="column-header income-header">CASH IN (${incomeEntries.length})</div>
+                    <table class="print-table compact">
+                        <thead><tr><th>#</th><th>Details</th><th class="text-right">Amount</th></tr></thead>
+                        <tbody>
+                            ${incomeEntries.length ? incomeEntries.map(rowHtml).join('') : '<tr><td colspan="3" class="text-center empty-cell">No income</td></tr>'}
+                        </tbody>
+                        <tfoot><tr class="total-row"><td colspan="2">TOTAL CASH IN</td><td class="text-right">${periodStats.income.toLocaleString()}</td></tr></tfoot>
+                    </table>
+                </div>
+                <div class="print-column">
+                    <div class="column-header expense-header">CASH OUT (${expenseEntries.length})</div>
+                    <table class="print-table compact">
+                        <thead><tr><th>#</th><th>Details</th><th class="text-right">Amount</th></tr></thead>
+                        <tbody>
+                            ${expenseEntries.length ? expenseEntries.map(rowHtml).join('') : '<tr><td colspan="3" class="text-center empty-cell">No expense</td></tr>'}
+                        </tbody>
+                        <tfoot><tr class="total-row"><td colspan="2">TOTAL CASH OUT</td><td class="text-right">${periodStats.expense.toLocaleString()}</td></tr></tfoot>
+                    </table>
+                </div>
+            </div>
+            <div class="print-footer-strong">
+                <div class="footer-sign">Signature: _______________________</div>
+                <div class="footer-time">Generated: ${new Date().toLocaleString()}</div>
+            </div>
+        </div>
+    `;
+
+    const container = document.getElementById('ledger-print-container');
+    if (!container) return;
+    container.innerHTML = html;
+    document.body.classList.add('printing-report');
+    window.print();
+    setTimeout(() => {
+        container.innerHTML = '';
+        document.body.classList.remove('printing-report');
+    }, 1000);
+}
+
 function setupFilterHandlers() {
     const roozDateFilter = document.getElementById('rooznamcha-date-filter');
     const reportStart = document.getElementById('report-start-date');
     const reportEnd = document.getElementById('report-end-date');
-    const genReportBtn = document.getElementById('btn-generate-filtered-report');
 
     roozDateFilter?.addEventListener('change', () => {
         updateUI(roozDateFilter.value);
     });
 
-    genReportBtn?.addEventListener('click', () => {
+    const onCustomDates = () => {
         const start = reportStart?.value || '';
         const end = reportEnd?.value || '';
         if (start && end && start > end) {
             showToast('Start date must be before end date.', 'error');
             return;
         }
-        const stats = db.getFilteredStats(start, end);
-        const currency = db.data.settings.currency || 'Rs.';
-        const summary = document.getElementById('report-filtered-summary');
-        const incomeEl = document.getElementById('report-filter-income');
-        const expenseEl = document.getElementById('report-filter-expense');
-        const netEl = document.getElementById('report-filter-net');
+        document.querySelectorAll('.preset-chip').forEach(btn => btn.classList.remove('active'));
+        updateReportsPage('custom');
+    };
+    reportStart?.addEventListener('change', onCustomDates);
+    reportEnd?.addEventListener('change', onCustomDates);
 
-        if (summary) summary.hidden = false;
-        if (incomeEl) incomeEl.innerText = formatMoney(stats.income, currency);
-        if (expenseEl) expenseEl.innerText = formatMoney(stats.expense, currency);
-        if (netEl) {
-            netEl.innerText = formatMoney(stats.net, currency);
-            netEl.className = `value ${stats.net >= 0 ? 'text-success' : 'text-danger'}`;
-        }
-
-        const rangeLabel = `${start || 'Beginning'} â†’ ${end || 'Today'}`;
-        showToast(`Filtered report: ${rangeLabel}`, 'success');
+    document.querySelectorAll('.preset-chip').forEach(btn => {
+        btn.addEventListener('click', () => applyReportPreset(btn.dataset.preset));
     });
+
+    document.getElementById('btn-print-full-report')?.addEventListener('click', printFullReport);
+    document.getElementById('btn-report-open-khata')?.addEventListener('click', () => switchView('khata'));
+
+    applyReportPreset('month');
 }
 
 function setupMobileNav() {
@@ -1195,9 +1441,15 @@ function setupModalHandlers() {
 
     // Button Listeners
     document.addEventListener('click', (e) => {
+        const reportEntry = e.target.closest('.report-entry');
+        if (reportEntry?.dataset.id) {
+            const entry = db.data.rooznamcha.find(en => en.id == reportEntry.dataset.id);
+            if (entry) openModal(`Edit Transaction #${entry.transactionNo}`, 'edit-entry', entry);
+            return;
+        }
+
         const interactive = e.target.closest('button, a, input, select, textarea, .table-actions');
         if (!interactive) {
-            const miniCust = e.target.closest('.customer-item');
             if (miniCust?.dataset.id) {
                 openModal('Customer Ledger Statement', 'view-ledger');
                 renderLedgerStatement(miniCust.dataset.id);
@@ -1290,7 +1542,8 @@ function setupModalHandlers() {
 
     // Backup & Restore
     document.getElementById('btn-export-csv')?.addEventListener('click', () => {
-        db.exportToCSV();
+        const { start, end } = getReportDateRange();
+        db.exportToCSV(start, end);
     });
 
     document.getElementById('btn-export-data')?.addEventListener('click', () => {
@@ -1669,6 +1922,7 @@ function updateUI(dateFilter = null, searchQuery = "") {
     updateCustomerLists();
     updateTrashList();
     updateCharts();
+    updateReportsPage();
 }
 
 function updateTrashList() {

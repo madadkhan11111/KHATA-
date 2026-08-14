@@ -6,7 +6,7 @@
     <title>KhataBook Pro - Premium Ledger & Daily Cash Book</title>
     <meta name="description" content="Professional Khata Book and Rooznamcha with free cloud accounts for shops worldwide.">
     <meta name="theme-color" content="#0d7377">
-    <meta name="application-version" content="1.6.0">
+    <meta name="application-version" content="1.7.0">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="KhataPro">
@@ -22,7 +22,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.6.0">
+    <link rel="stylesheet" href="style.css?v=1.7.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -388,74 +388,108 @@
                     <div class="view-header">
                         <div class="header-main">
                             <h2>Reports</h2>
-                            <p class="hide-on-mobile">Generate summaries and data backup.</p>
+                            <p class="hide-on-mobile">Cash, khata, and backups for any period.</p>
                         </div>
-                        <div class="top-actions no-print">
-                            <button class="btn btn-secondary" id="btn-export-csv">
-                                <i class="fas fa-file-csv"></i> Export to Excel
-                            </button>
-                            <button class="btn btn-secondary" id="btn-export-data">
-                                <i class="fas fa-file-export"></i> Export Backup
-                            </button>
-                            <button class="btn btn-secondary" id="btn-import-data">
-                                <i class="fas fa-file-import"></i> Import Backup
-                            </button>
-                            <input type="file" id="import-file-input" style="display: none;" accept=".json">
-                            <button class="btn btn-primary" onclick="window.print()">
-                                <i class="fas fa-print"></i> Print Full Report
-                            </button>
+                    </div>
+
+                    <div class="report-period-bar no-print">
+                        <div class="report-presets" role="group" aria-label="Report period">
+                            <button type="button" class="preset-chip" data-preset="today">Today</button>
+                            <button type="button" class="preset-chip" data-preset="week">7 Days</button>
+                            <button type="button" class="preset-chip active" data-preset="month">This Month</button>
+                            <button type="button" class="preset-chip" data-preset="year">This Year</button>
+                            <button type="button" class="preset-chip" data-preset="all">All Time</button>
+                        </div>
+                        <div class="report-dates">
+                            <label class="report-date-field">
+                                <span>From</span>
+                                <input type="date" id="report-start-date">
+                            </label>
+                            <label class="report-date-field">
+                                <span>To</span>
+                                <input type="date" id="report-end-date">
+                            </label>
+                        </div>
+                    </div>
+
+                    <p class="report-range-label" id="report-range-label">This month</p>
+
+                    <div class="daily-summary-bar report-period-stats">
+                        <div class="day-stat income">
+                            <span class="label">Cash In</span>
+                            <span class="value" id="report-filter-income">Rs. 0</span>
+                        </div>
+                        <div class="day-stat expense">
+                            <span class="label">Cash Out</span>
+                            <span class="value" id="report-filter-expense">Rs. 0</span>
+                        </div>
+                        <div class="day-stat net">
+                            <span class="label">Net</span>
+                            <span class="value" id="report-filter-net">Rs. 0</span>
+                        </div>
+                    </div>
+
+                    <div class="daily-summary-bar report-account-stats">
+                        <div class="day-stat income">
+                            <span class="label">They will give</span>
+                            <span class="value text-success" id="report-rec">—</span>
+                        </div>
+                        <div class="day-stat expense">
+                            <span class="label">You will give</span>
+                            <span class="value text-danger" id="report-pay">—</span>
+                        </div>
+                        <div class="day-stat net">
+                            <span class="label">Cash in Hand</span>
+                            <span class="value" id="report-cash">—</span>
                         </div>
                     </div>
 
                     <div class="reports-grid">
-                        <div class="content-card printable-area">
+                        <div class="content-card">
                             <div class="card-header">
-                                <h3>Account Summary</h3>
+                                <h3>By Category</h3>
+                                <span class="report-mini-count" id="report-entry-count">0 entries</span>
                             </div>
-                            <div class="report-summary-stats">
-                                <div class="report-stat">
-                                    <span class="label">Total receivables from Customers</span>
-                                    <span class="value text-success" id="report-rec">—</span>
-                                </div>
-                                <div class="report-stat">
-                                    <span class="label">Total payables to Customers</span>
-                                    <span class="value text-danger" id="report-pay">—</span>
-                                </div>
-                                <div class="report-stat">
-                                    <span class="label">Net Cash in Hand</span>
-                                    <span class="value" id="report-cash">—</span>
-                                </div>
+                            <div id="report-category-list" class="report-stack">
+                                <p class="empty-state">No entries in this period.</p>
                             </div>
                         </div>
 
-                        <div class="content-card no-print">
+                        <div class="content-card">
                             <div class="card-header">
-                                <h3>Quick Actions</h3>
+                                <h3>Who Owes</h3>
+                                <button type="button" class="btn-text" data-view="khata" id="btn-report-open-khata">All Khata</button>
                             </div>
-                            <div class="reports-actions">
-                                <p>Select a date range to filter your daily book summaries.</p>
-                                <div class="filter-group" style="margin-top: 1rem;">
-                                    <input type="date" id="report-start-date">
-                                    <span>to</span>
-                                    <input type="date" id="report-end-date">
-                                </div>
-                                <button type="button" class="btn btn-secondary" id="btn-generate-filtered-report" style="margin-top: 1rem; width: 100%;">Generate Filtered Report</button>
-                                <div id="report-filtered-summary" class="report-filtered-summary" hidden>
-                                    <div class="report-stat">
-                                        <span class="label">Cash In (selected period)</span>
-                                        <span class="value text-success" id="report-filter-income">—</span>
-                                    </div>
-                                    <div class="report-stat">
-                                        <span class="label">Cash Out (selected period)</span>
-                                        <span class="value text-danger" id="report-filter-expense">—</span>
-                                    </div>
-                                    <div class="report-stat">
-                                        <span class="label">Net for period</span>
-                                        <span class="value" id="report-filter-net">—</span>
-                                    </div>
-                                </div>
+                            <div id="report-khata-list" class="report-stack">
+                                <p class="empty-state">No customer balances yet.</p>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="content-card report-entries-card">
+                        <div class="card-header">
+                            <h3>Entries</h3>
+                            <span class="report-mini-count" id="report-entries-hint">Tap to edit</span>
+                        </div>
+                        <div id="report-entries-list" class="report-entries">
+                            <p class="empty-state">No transactions in this period.</p>
+                        </div>
+                    </div>
+
+                    <div class="report-tools no-print">
+                        <button type="button" class="btn btn-primary" id="btn-print-full-report">
+                            <i class="fas fa-print"></i> Print Report
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="btn-export-csv">
+                            <i class="fas fa-file-csv"></i> Excel
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="btn-export-data">
+                            <i class="fas fa-cloud-arrow-down"></i> Backup
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="btn-import-data">
+                            <i class="fas fa-cloud-arrow-up"></i> Import
+                        </button>
+                        <input type="file" id="import-file-input" hidden accept=".json">
                     </div>
                 </section>
 
@@ -596,8 +630,8 @@
     <!-- Print Containers -->
     <div id="ledger-print-container"></div>
 
-    <script src="site-config.js?v=1.6.0"></script>
-    <script src="cloud-auth.js?v=1.6.0"></script>
-    <script src="app.js?v=1.6.0"></script>
+    <script src="site-config.js?v=1.7.0"></script>
+    <script src="cloud-auth.js?v=1.7.0"></script>
+    <script src="app.js?v=1.7.0"></script>
 </body>
 </html>
