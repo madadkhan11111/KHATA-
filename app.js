@@ -2643,7 +2643,7 @@ function showToast(message, type = 'info') {
     clearTimeout(window.toastTimer);
     window.toastTimer = setTimeout(() => {
         toast.classList.remove('show');
-    }, 4000);
+    }, 2500);
 }
 
 function showUndoToast(message) {

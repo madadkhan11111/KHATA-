@@ -1819,9 +1819,9 @@ body.dark-theme .form-group.highlight {
 /* Undo Toast */
 .toast-container {
     position: fixed;
-    bottom: 2rem;
+    bottom: 1.5rem;
     left: 50%;
-    transform: translateX(-50%) translateY(150px);
+    transform: translateX(-50%) translateY(12px);
     background: #1e293b;
     color: white;
     padding: 0.85rem 1.5rem;
@@ -1830,14 +1830,19 @@ body.dark-theme .form-group.highlight {
     align-items: center;
     gap: 1rem;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    z-index: 9999;
-    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 80;
+    transition: transform 0.25s ease, opacity 0.25s ease, visibility 0.25s ease;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    pointer-events: auto;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
 }
 
 .toast-container.show {
     transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
 }
 
 .toast-container i {
@@ -3188,12 +3193,13 @@ body.rtl .form-row {
     }
 
     .toast-container {
-        bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) + 4.75rem);
+        bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) + 5.5rem);
         width: calc(100% - 1.5rem);
         max-width: 420px;
         border-radius: 16px;
         padding: 0.85rem 1.1rem;
         left: 50%;
+        z-index: 140;
     }
 
     .bottom-nav {
