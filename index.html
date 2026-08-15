@@ -6,7 +6,7 @@
     <title>KhataBook Pro - Premium Ledger & Daily Cash Book</title>
     <meta name="description" content="Professional Khata Book and Rooznamcha with free cloud accounts for shops worldwide.">
     <meta name="theme-color" content="#0d7377">
-    <meta name="application-version" content="1.9.7">
+    <meta name="application-version" content="1.9.8">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="KhataPro">
@@ -22,7 +22,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.9.7">
+    <link rel="stylesheet" href="style.css?v=1.9.8">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -167,7 +167,7 @@
                     </div>
 
                     <div class="stats-grid">
-                        <div class="stat-card primary">
+                        <div class="stat-card primary" id="card-cash-in-hand" role="button" tabindex="0" title="Set opening cash in Settings">
                             <div class="stat-header">
                                 <div class="stat-icon"><i class="fas fa-wallet"></i></div>
                                 <span class="trend up" id="cash-trend" hidden><i class="fas fa-arrow-up"></i> <span id="cash-trend-value">0%</span></span>
@@ -175,6 +175,7 @@
                             <div class="stat-info">
                                 <span class="label">Cash in Hand</span>
                                 <h3 id="total-cash">0.00</h3>
+                                <p class="stat-hint">Opening cash + Daily Book</p>
                             </div>
                         </div>
                         <div class="stat-card success">
@@ -536,6 +537,11 @@
                                         <option value="ur">Urdu (اردو)</option>
                                     </select>
                                 </div>
+                                <div class="form-group">
+                                    <label>Opening Cash (Cash in Hand)</label>
+                                    <input type="number" id="setting-opening-cash" inputmode="decimal" step="0.01" placeholder="0">
+                                    <p class="form-hint">Your starting cash. Daily Book income adds to this. Daily Book expense subtracts. You do not type Cash in Hand on each entry.</p>
+                                </div>
                                 <button type="submit" class="btn btn-primary">Save Settings</button>
                             </form>
                         </div>
@@ -615,8 +621,8 @@
     <!-- Print Containers -->
     <div id="ledger-print-container"></div>
 
-    <script src="site-config.js?v=1.9.7"></script>
-    <script src="cloud-auth.js?v=1.9.7"></script>
-    <script src="app.js?v=1.9.7"></script>
+    <script src="site-config.js?v=1.9.8"></script>
+    <script src="cloud-auth.js?v=1.9.8"></script>
+    <script src="app.js?v=1.9.8"></script>
 </body>
 </html>

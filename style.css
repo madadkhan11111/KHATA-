@@ -513,6 +513,17 @@ body.dark-theme .nav-link:hover {
     font-weight: 700;
 }
 
+.stat-hint {
+    margin: 0.35rem 0 0;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+#card-cash-in-hand {
+    cursor: pointer;
+}
+
 .trend {
     font-size: 0.8rem;
     font-weight: 600;

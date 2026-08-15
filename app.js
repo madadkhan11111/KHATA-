@@ -61,7 +61,8 @@ class DataManager {
                 language: 'en',
                 backupFolderPath: null,
                 nextKhataNo: 1,
-                nextTransactionNo: 1001
+                nextTransactionNo: 1001,
+                openingCash: 0
             }
         };
         this.undoStack = [];
@@ -74,6 +75,9 @@ class DataManager {
         if (!this.data.settings.nextTransactionNo) this.data.settings.nextTransactionNo = 1001;
         if (!this.data.settings.language) this.data.settings.language = 'en';
         if (this.data.settings.backupFolderPath === undefined) this.data.settings.backupFolderPath = null;
+        if (this.data.settings.openingCash === undefined || this.data.settings.openingCash === null) {
+            this.data.settings.openingCash = 0;
+        }
     }
 
     save(isUndoRedo = false) {
@@ -298,7 +302,7 @@ class DataManager {
         const totalReceivables = this.data.customers.reduce((sum, c) => sum + (c.balance > 0 ? c.balance : 0), 0);
         const totalPayables = this.data.customers.reduce((sum, c) => sum + (c.balance < 0 ? Math.abs(c.balance) : 0), 0);
         
-        let cashInHand = 0;
+        let cashInHand = Number(this.data.settings.openingCash) || 0;
         this.data.rooznamcha.forEach(entry => {
             const amount = Number(entry.amount) || 0;
             if (entry.type === 'income') cashInHand += amount;
@@ -406,10 +410,11 @@ class DataManager {
         this.save();
     }
 
-    updateSettings(shopName, currency, language) {
+    updateSettings(shopName, currency, language, openingCash) {
         this.data.settings.shopName = shopName;
         this.data.settings.currency = currency;
         this.data.settings.language = language;
+        this.data.settings.openingCash = Number(openingCash) || 0;
         this.save();
         this.applyLanguage();
     }
@@ -478,7 +483,8 @@ class DataManager {
                     language: this.data.settings.language || 'en',
                     backupFolderPath: null,
                     nextKhataNo: 1,
-                    nextTransactionNo: 1001
+                    nextTransactionNo: 1001,
+                    openingCash: 0
                 }
             };
             localStorage.setItem('khata-data', JSON.stringify(this.data));
@@ -544,7 +550,8 @@ class DataManager {
                 language: 'en',
                 backupFolderPath: null,
                 nextKhataNo: 1,
-                nextTransactionNo: 1001
+                nextTransactionNo: 1001,
+                openingCash: 0
             };
 
             this.data = {
@@ -979,15 +986,17 @@ function setupSettingsHandlers() {
     const shopNameInput = document.getElementById('setting-shop-name');
     const currencyInput = document.getElementById('setting-currency');
     const languageInput = document.getElementById('setting-language');
+    const openingCashInput = document.getElementById('setting-opening-cash');
     const resetBtn = document.getElementById('btn-reset-data');
 
     if (shopNameInput) shopNameInput.value = db.data.settings.shopName || 'My Business';
     if (currencyInput) currencyInput.value = db.data.settings.currency || 'Rs.';
     if (languageInput) languageInput.value = db.data.settings.language || 'en';
+    if (openingCashInput) openingCashInput.value = db.data.settings.openingCash ?? 0;
 
     settingsForm?.addEventListener('submit', (e) => {
         e.preventDefault();
-        db.updateSettings(shopNameInput.value, currencyInput.value, languageInput.value);
+        db.updateSettings(shopNameInput.value, currencyInput.value, languageInput.value, openingCashInput?.value);
         updateProfileDisplay();
         showToast('Settings saved successfully!', 'success');
         updateUI();
@@ -995,6 +1004,19 @@ function setupSettingsHandlers() {
 
     resetBtn?.addEventListener('click', () => {
         db.resetData();
+    });
+
+    const openCashSettings = () => {
+        switchView('settings');
+        requestAnimationFrame(() => document.getElementById('setting-opening-cash')?.focus());
+    };
+    const cashCard = document.getElementById('card-cash-in-hand');
+    cashCard?.addEventListener('click', openCashSettings);
+    cashCard?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openCashSettings();
+        }
     });
 
     if (window.AccountCloud) AccountCloud.updateAccountWidgets();
