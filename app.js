@@ -14,7 +14,7 @@ const translations = {
         receivables: 'Total Receivables',
         payables: 'Total Payables',
         newEntry: 'New Entry',
-        addCustomer: 'Add Customer',
+        addCustomer: 'Add Party',
         addIncome: 'Add Income',
         addExpense: 'Add Expense',
         home: 'Home',
@@ -118,7 +118,7 @@ class DataManager {
     }
 
     // Customer Management
-    addCustomer(name, phone, manualKhataNo = null) {
+    addCustomer(name, phone, manualKhataNo = null, extra = {}) {
         const id = Date.now().toString();
         let khataNo = manualKhataNo;
         
@@ -137,16 +137,30 @@ class DataManager {
             }
         }
 
-        this.data.customers.push({ id, khataNo, name, phone, balance: 0, transactions: [] });
-        this.save();
+        const role = extra.role === 'supplier' ? 'supplier' : 'customer';
+        this.data.customers.push({ id, khataNo, name, phone: phone || '', balance: 0, transactions: [], role });
+        const opening = Number(extra.openingAmount) || 0;
+        if (opening > 0) {
+            const openingType = extra.openingType === 'debit' ? 'debit' : 'credit';
+            this.addKhataEntry(id, opening, openingType, 'Opening balance', null, extra.openingDate || null);
+        } else {
+            this.save();
+        }
         return id;
     }
 
     // Ledger Transactions (Internal)
-    addKhataEntry(customerId, amount, type, description, linkedId = null) {
-        const customer = this.data.customers.find(c => c.id === customerId);
+    addKhataEntry(customerId, amount, type, description, linkedId = null, dateISO = null) {
+        const customer = this.data.customers.find(c => c.id == customerId);
         if (customer) {
-            const entry = { id: Date.now().toString(), amount, type, description, date: new Date().toISOString(), linkedId };
+            const entry = {
+                id: Date.now().toString(),
+                amount,
+                type,
+                description,
+                date: dateISO || new Date().toISOString(),
+                linkedId
+            };
             customer.transactions.push(entry);
             customer.balance += (type === 'credit' ? amount : -amount);
             this.save();
@@ -154,7 +168,7 @@ class DataManager {
     }
 
     // Rooznamcha Management (Daily Diary)
-    addRooznamchaEntry(amount, type, category, description, customerId = null) {
+    addRooznamchaEntry(amount, type, category, description, customerId = null, dateISO = null) {
         const entryId = Date.now().toString();
         const transactionNo = this.data.settings.nextTransactionNo++;
         const pageNo = Math.floor(this.data.rooznamcha.length / 20) + 1; // 20 entries per page
@@ -167,7 +181,7 @@ class DataManager {
             type, // income or expense
             category,
             description,
-            date: new Date().toISOString(),
+            date: dateISO || new Date().toISOString(),
             customerId // Link to Khata if provided
         };
         this.data.rooznamcha.push(entry);
@@ -333,11 +347,12 @@ class DataManager {
     }
 
     // Deletion & Undo
-    updateCustomer(id, name, phone) {
+    updateCustomer(id, name, phone, role) {
         const customer = this.data.customers.find(c => c.id == id);
         if (customer) {
             customer.name = name;
-            customer.phone = phone;
+            customer.phone = phone || '';
+            if (role === 'supplier' || role === 'customer') customer.role = role;
             this.save();
         }
     }
@@ -701,6 +716,20 @@ function localISODate(date = new Date()) {
     return `${y}-${m}-${d}`;
 }
 
+function partyRole(party) {
+    return party?.role === 'supplier' ? 'supplier' : 'customer';
+}
+
+function partyRoleLabel(party) {
+    return partyRole(party) === 'supplier' ? 'Supplier' : 'Customer';
+}
+
+function dateToISO(dateValue) {
+    if (!dateValue) return new Date().toISOString();
+    if (String(dateValue).includes('T')) return dateValue;
+    return `${dateValue}T12:00:00`;
+}
+
 function getCashTrendPercent() {
     const today = new Date();
     let current = 0;
@@ -753,6 +782,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 let cashflowChart = null;
 let distributionChart = null;
+let khataPartyFilter = 'all';
 
 async function initApp() {
     applySiteConfig();
@@ -996,6 +1026,22 @@ function setupSearchHandlers() {
             const text = row.textContent.toLowerCase();
             row.style.display = text.includes(query) ? '' : 'none';
         });
+    });
+
+    document.getElementById('khata-filters')?.addEventListener('click', (e) => {
+        const chip = e.target.closest('[data-khata-filter]');
+        if (!chip) return;
+        khataPartyFilter = chip.dataset.khataFilter || 'all';
+        document.querySelectorAll('#khata-filters [data-khata-filter]').forEach(btn => {
+            btn.classList.toggle('active', btn === chip);
+        });
+        updateCustomerLists();
+        const query = document.getElementById('customer-search')?.value?.toLowerCase();
+        if (query) {
+            document.querySelectorAll('#customers-list tr').forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(query) ? '' : 'none';
+            });
+        }
     });
 }
 
@@ -1686,6 +1732,23 @@ function setupModalHandlers() {
 
     // Button Listeners
     document.addEventListener('click', (e) => {
+        const typeBtn = e.target.closest('[data-khata-type]');
+        if (typeBtn) {
+            e.preventDefault();
+            setKhataEntryKind(typeBtn.dataset.khataType);
+            return;
+        }
+        const roleBtn = e.target.closest('[data-party-role]');
+        if (roleBtn) {
+            e.preventDefault();
+            const input = document.getElementById('party-role-input');
+            if (input) input.value = roleBtn.dataset.partyRole;
+            document.querySelectorAll('[data-party-role]').forEach(btn => {
+                btn.classList.toggle('active', btn === roleBtn);
+            });
+            return;
+        }
+
         const reportEntry = e.target.closest('.report-entry');
         if (reportEntry?.dataset.id) {
             const entry = db.data.rooznamcha.find(en => en.id == reportEntry.dataset.id);
@@ -1719,7 +1782,7 @@ function setupModalHandlers() {
         if (!target) return;
 
         if (target.classList.contains('btn-add-customer')) {
-            openModal('Add New Customer', 'add-customer');
+            openModal('Add Party', 'add-customer');
         } else if (target.classList.contains('btn-add-income')) {
             openModal('Add Income', 'add-income');
         } else if (target.classList.contains('btn-add-expense')) {
@@ -1729,7 +1792,7 @@ function setupModalHandlers() {
         } else if (target.classList.contains('btn-edit-customer')) {
             const id = target.dataset.id;
             const customer = db.data.customers.find(c => c.id == id);
-            openModal('Edit Customer', 'edit-customer', customer);
+            openModal('Edit Party', 'edit-customer', customer);
         } else if (target.classList.contains('btn-edit-entry')) {
             const id = target.dataset.id;
             const entry = db.data.rooznamcha.find(e => e.id == id);
@@ -1740,9 +1803,7 @@ function setupModalHandlers() {
                 openModal('Account Statement', 'view-ledger');
                 renderLedgerStatement(customerId);
             } else {
-                const customer = db.data.customers.find(c => c.id === customerId);
-                openModal(`Add Entry for ${customer.name}`, 'khata-entry');
-                mainForm.dataset.customerId = customerId;
+                openKhataQuick(customerId, target.dataset.kind || 'credit');
             }
         } else if (target.closest('.btn-whatsapp-direct')) {
             const customerId = target.closest('.btn-whatsapp-direct').dataset.id;
@@ -1860,6 +1921,30 @@ function setupModalHandlers() {
     });
 }
 
+function setKhataEntryKind(kind) {
+    const type = kind === 'debit' ? 'debit' : 'credit';
+    const hidden = document.getElementById('khata-entry-type');
+    if (hidden) hidden.value = type;
+    document.querySelectorAll('[data-khata-type]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.khataType === type);
+    });
+    const hint = document.getElementById('khata-entry-hint');
+    const cashLabel = document.getElementById('khata-cash-label');
+    const cash = document.querySelector('#main-form [name="alsoCash"]');
+    const save = document.getElementById('khata-save-btn');
+    if (type === 'credit') {
+        if (hint) hint.textContent = 'Goods or cash you gave this party. They will owe you more.';
+        if (cashLabel) cashLabel.textContent = 'This was cash given (add to Daily Book)';
+        if (cash) cash.checked = false;
+        if (save) save.textContent = 'Save You Gave';
+    } else {
+        if (hint) hint.textContent = 'Cash this party paid you, or goods they gave you.';
+        if (cashLabel) cashLabel.textContent = 'Also add cash in Daily Book';
+        if (cash) cash.checked = true;
+        if (save) save.textContent = 'Save You Got';
+    }
+}
+
 function closeModal() {
     const modal = document.getElementById('modal-container');
     modal?.classList.remove('active');
@@ -1875,8 +1960,16 @@ function openModal(title, type, data = null) {
     
     modalTitle.innerText = title;
     form.dataset.type = type;
-    if (data && data.id) form.dataset.editId = data.id;
-    else delete form.dataset.editId;
+    if (type === 'khata-entry' && data?.customerId) {
+        form.dataset.customerId = data.customerId;
+        delete form.dataset.editId;
+    } else if (data && data.id) {
+        form.dataset.editId = data.id;
+        delete form.dataset.customerId;
+    } else {
+        delete form.dataset.editId;
+        if (type !== 'khata-entry') delete form.dataset.customerId;
+    }
 
     form.innerHTML = renderForm(type, data);
     modal.querySelector('.modal-card')?.classList.toggle('modal-wide', type === 'view-ledger');
@@ -1889,24 +1982,46 @@ function renderForm(type, data = null) {
         case 'add-customer':
         case 'edit-customer':
             const isCustEdit = type === 'edit-customer';
+            const role = partyRole(data);
             return `
                 <div class="form-group">
-                    <label>Customer Name</label>
-                    <input type="text" name="name" autocomplete="name" required placeholder="Enter name" value="${data ? data.name : ''}">
+                    <label>Party type</label>
+                    <div class="gave-got-toggle role-toggle">
+                        <button type="button" class="gave-got-btn ${role === 'customer' ? 'active' : ''}" data-party-role="customer">Customer</button>
+                        <button type="button" class="gave-got-btn ${role === 'supplier' ? 'active' : ''}" data-party-role="supplier">Supplier</button>
+                    </div>
+                    <input type="hidden" name="role" id="party-role-input" value="${role}">
+                    <p class="form-hint">Customer = they buy from you. Supplier = you buy from them.</p>
+                </div>
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" name="name" autocomplete="name" required placeholder="Enter name" value="${data ? escapeHtml(data.name) : ''}">
                 </div>
                 <div class="form-group">
                     <label>Phone Number</label>
-                    <input type="tel" name="phone" inputmode="numeric" autocomplete="tel" required placeholder="03xx-xxxxxxx" value="${data ? data.phone : ''}">
+                    <input type="tel" name="phone" inputmode="numeric" autocomplete="tel" placeholder="03xx-xxxxxxx (optional)" value="${data ? escapeHtml(data.phone || '') : ''}">
                 </div>
                 ${!isCustEdit ? `
-                <div class="form-group highlight">
+                <div class="form-group">
                     <label>Manual Khata No (Optional)</label>
                     <input type="number" name="manualKhataNo" placeholder="Leave empty for auto-assign">
-                    <p class="form-hint">If left blank, the app will automatically assign the next available number.</p>
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label>Opening balance</label>
+                        <input type="number" name="openingAmount" inputmode="decimal" step="0.01" min="0" placeholder="0">
+                    </div>
+                    <div class="form-group flex-1">
+                        <label>Opening type</label>
+                        <select name="openingType">
+                            <option value="credit">They already owe you</option>
+                            <option value="debit">You already owe them</option>
+                        </select>
+                    </div>
                 </div>
                 ` : ''}
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">${data ? 'Update' : 'Save'} Customer</button>
+                    <button type="submit" class="btn btn-primary">${data ? 'Update' : 'Save'} Party</button>
                 </div>
             `;
         case 'add-income':
@@ -1957,27 +2072,39 @@ function renderForm(type, data = null) {
                     <button type="submit" class="btn btn-primary full-width">${isEdit ? 'Update' : 'Post'} to Daily Book & Khata</button>
                 </div>
             `;
-        case 'khata-entry':
+        case 'khata-entry': {
+            const kind = data?.kind === 'debit' ? 'debit' : 'credit';
+            const today = localISODate();
             return `
-                <div class="form-group">
-                    <label>Type</label>
-                    <select name="type">
-                        <option value="credit">Credit (I will receive)</option>
-                        <option value="debit">Debit (I paid/gave)</option>
-                    </select>
+                <div class="gave-got-toggle" role="group" aria-label="You Gave or You Got">
+                    <button type="button" class="gave-got-btn gave ${kind === 'credit' ? 'active' : ''}" data-khata-type="credit">You Gave</button>
+                    <button type="button" class="gave-got-btn got ${kind === 'debit' ? 'active' : ''}" data-khata-type="debit">You Got</button>
                 </div>
+                <input type="hidden" name="type" id="khata-entry-type" value="${kind}">
+                <p class="form-hint" id="khata-entry-hint">${kind === 'credit'
+                    ? 'Goods or cash you gave this party. They will owe you more.'
+                    : 'Cash this party paid you, or goods they gave you.'}</p>
                 <div class="form-group">
                     <label>Amount</label>
-                    <input type="number" name="amount" inputmode="decimal" step="0.01" min="0" required>
+                    <input type="number" name="amount" inputmode="decimal" step="0.01" min="0" required placeholder="0.00" autofocus>
                 </div>
                 <div class="form-group">
-                    <label>Description</label>
-                    <input type="text" name="description" placeholder="Details">
+                    <label>Details</label>
+                    <input type="text" name="description" placeholder="Bill no, item, or note">
                 </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" name="entryDate" value="${today}" required>
+                </div>
+                <label class="check-row">
+                    <input type="checkbox" name="alsoCash" ${kind === 'debit' ? 'checked' : ''}>
+                    <span id="khata-cash-label">${kind === 'debit' ? 'Also add cash in Daily Book' : 'This was cash given (add to Daily Book)'}</span>
+                </label>
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">Add to Ledger</button>
+                    <button type="submit" class="btn btn-primary full-width" id="khata-save-btn">${kind === 'credit' ? 'Save You Gave' : 'Save You Got'}</button>
                 </div>
             `;
+        }
         case 'view-ledger':
             return `<div id="ledger-statement-view"></div>`;
         default: return '';
@@ -2030,9 +2157,17 @@ function renderLedgerStatement(customerId) {
                 <strong>${escapeHtml(result.amount)}</strong>
                 <p>${escapeHtml(result.explain)}</p>
             </div>
+            <div class="ledger-quick no-print">
+                <button type="button" class="ledger-quick-btn gave" onclick="openKhataQuick('${customerId}','credit')">You Gave</button>
+                <button type="button" class="ledger-quick-btn got" onclick="openKhataQuick('${customerId}','debit')">You Got</button>
+            </div>
+            ${result.tone !== 'clear' ? `
+            <button type="button" class="btn btn-secondary ledger-remind no-print" onclick="remindOnWhatsApp('${customerId}')">
+                <i class="fab fa-whatsapp"></i> ${result.tone === 'due' ? 'Remind to pay' : 'Send balance on WhatsApp'}
+            </button>` : ''}
             <div class="ledger-party-card">
                 <div>
-                    <span class="ledger-party-label">Customer</span>
+                    <span class="ledger-party-label">${escapeHtml(partyRoleLabel(customer))}</span>
                     <div class="ledger-party-value">${escapeHtml(customer.name)}</div>
                     <div class="ledger-party-sub">${escapeHtml(customer.phone || shopName)}</div>
                 </div>
@@ -2099,20 +2234,47 @@ window.copyLedgerAsText = (customerId) => {
     });
 };
 
+window.openKhataQuick = (customerId, kind) => {
+    const customer = db.data.customers.find(c => c.id == customerId);
+    if (!customer) return;
+    const type = kind === 'debit' ? 'debit' : 'credit';
+    const title = type === 'credit' ? `You Gave — ${customer.name}` : `You Got — ${customer.name}`;
+    openModal(title, 'khata-entry', { customerId, kind: type });
+};
+
+function openWhatsAppText(customer, text) {
+    const phoneNumber = String(customer?.phone || '').replace(/[^0-9]/g, '');
+    const finalPhone = !phoneNumber
+        ? ''
+        : (phoneNumber.startsWith('92') || phoneNumber.length > 10 ? phoneNumber : `92${phoneNumber}`);
+    const url = finalPhone
+        ? `https://wa.me/${finalPhone}?text=${encodeURIComponent(text)}`
+        : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+}
+
+window.remindOnWhatsApp = (customerId) => {
+    const model = getLedgerStatementModel(customerId);
+    if (!model) return;
+    const result = statementResult(model);
+    const { customer, shopName } = model;
+    let text;
+    if (model.closing > 0) {
+        text = `Assalamualaikum ${customer.name},\n\nYour pending amount with ${shopName} is *${result.amount}*.\nPlease pay soon. Thank you.\n\nAap ka pending amount ${result.amount} hai. Shukriya.`;
+    } else if (model.closing < 0) {
+        text = `Assalamualaikum ${customer.name},\n\n${shopName} has to pay you *${result.amount}*.`;
+    } else {
+        text = `Assalamualaikum ${customer.name},\n\nYour khata with ${shopName} is clear. Shukriya.`;
+    }
+    openWhatsAppText(customer, text);
+};
+
 function shareOnWhatsApp(customerId) {
     const customer = db.data.customers.find(c => c.id == customerId);
     if (!customer) return;
     const text = buildLedgerText(customerId, 20);
     if (!text) return;
-    const phoneNumber = String(customer.phone || '').replace(/[^0-9]/g, '');
-    const finalPhone = !phoneNumber
-        ? ''
-        : (phoneNumber.startsWith('92') || phoneNumber.length > 10 ? phoneNumber : `92${phoneNumber}`);
-    const encodedMessage = encodeURIComponent(text);
-    const url = finalPhone
-        ? `https://wa.me/${finalPhone}?text=${encodedMessage}`
-        : `https://wa.me/?text=${encodedMessage}`;
-    window.open(url, '_blank');
+    openWhatsAppText(customer, text);
 }
 window.shareOnWhatsApp = shareOnWhatsApp;
 
@@ -2125,14 +2287,19 @@ function handleFormSubmit(formData) {
         const name = formData.get('name')?.trim();
         const phone = formData.get('phone')?.trim();
         const manualKhataNo = formData.get('manualKhataNo')?.trim();
-        if (!name || !phone) { showToast('Name and phone are required.', 'error'); return false; }
+        const role = formData.get('role') === 'supplier' ? 'supplier' : 'customer';
+        if (!name) { showToast('Name is required.', 'error'); return false; }
         
         if (editId) {
-            db.updateCustomer(editId, name, phone);
-            showToast('Customer updated successfully!', 'success');
+            db.updateCustomer(editId, name, phone, role);
+            showToast('Party updated successfully!', 'success');
         } else {
-            db.addCustomer(name, phone, manualKhataNo);
-            showToast('New customer added!', 'success');
+            db.addCustomer(name, phone, manualKhataNo, {
+                role,
+                openingAmount: formData.get('openingAmount'),
+                openingType: formData.get('openingType')
+            });
+            showToast('New party added!', 'success');
         }
     } else if (type === 'add-income' || type === 'add-expense' || type === 'edit-entry' || type === 'income' || type === 'expense') {
         const amount = parseFloat(formData.get('amount'));
@@ -2153,8 +2320,22 @@ function handleFormSubmit(formData) {
     } else if (type === 'khata-entry') {
         const amount = parseFloat(formData.get('amount'));
         if (isNaN(amount) || amount <= 0) { showToast('Enter a valid amount greater than 0.', 'error'); return false; }
-        db.addKhataEntry(form.dataset.customerId, amount, formData.get('type'), formData.get('description'));
-        showToast('Ledger entry added!', 'success');
+        const customerId = form.dataset.customerId;
+        const customer = db.data.customers.find(c => c.id == customerId);
+        if (!customer) { showToast('Party not found.', 'error'); return false; }
+        const entryType = formData.get('type') === 'debit' ? 'debit' : 'credit';
+        const description = (formData.get('description') || '').trim() || (entryType === 'credit' ? 'You gave' : 'You got');
+        const dateISO = dateToISO(formData.get('entryDate'));
+        db.addKhataEntry(customerId, amount, entryType, description, null, dateISO);
+        if (formData.get('alsoCash')) {
+            const cashType = entryType === 'debit' ? 'income' : 'expense';
+            db.addRooznamchaEntry(amount, cashType, 'Khata', `${customer.name}: ${description}`, null, dateISO);
+        }
+        showToast(entryType === 'credit' ? 'You Gave saved.' : 'You Got saved.', 'success');
+        updateUI();
+        openModal('Account Statement', 'view-ledger');
+        renderLedgerStatement(customerId);
+        return false;
     }
     return true;
 }
@@ -2361,15 +2542,22 @@ function updateCustomerLists() {
     
     if (!topCustomers && !khataList) return;
 
-    const customers = [...db.data.customers].sort((a,b) => b.balance - a.balance);
+    const customers = [...db.data.customers].sort((a,b) => Math.abs(b.balance) - Math.abs(a.balance));
+    const visible = customers.filter(c => {
+        if (khataPartyFilter === 'collect') return c.balance > 0;
+        if (khataPartyFilter === 'pay') return c.balance < 0;
+        if (khataPartyFilter === 'customer') return partyRole(c) === 'customer';
+        if (khataPartyFilter === 'supplier') return partyRole(c) === 'supplier';
+        return true;
+    });
     
     if (topCustomers) {
-        const top = customers.slice(0, 5);
-        topCustomers.innerHTML = top.length === 0 ? '<p class="empty-state">No customers added yet.</p>' : top.map(c => `
+        const top = customers.filter(c => c.balance !== 0).slice(0, 5);
+        topCustomers.innerHTML = top.length === 0 ? '<p class="empty-state">No pending khata yet.</p>' : top.map(c => `
             <div class="customer-item" data-id="${c.id}" role="button" tabindex="0">
                 <div class="cust-info">
-                    <span class="cust-name">${c.name}</span>
-                    <span class="cust-phone">${c.phone}</span>
+                    <span class="cust-name">${escapeHtml(c.name)}</span>
+                    <span class="cust-phone">${c.balance > 0 ? 'Has to pay you' : c.balance < 0 ? 'You have to pay' : 'Clear'}</span>
                 </div>
                 <span class="cust-balance ${c.balance >= 0 ? 'plus' : 'minus'}">
                     ${currency} ${Math.abs(c.balance).toLocaleString()}
@@ -2379,27 +2567,31 @@ function updateCustomerLists() {
     }
 
     if (khataList) {
-        khataList.innerHTML = customers.length === 0 ? '<tr class="empty-row"><td colspan="6" class="text-center">No customers found</td></tr>' : customers.map(c => {
-            const lastDate = c.transactions.length > 0 ? new Date(c.transactions[c.transactions.length-1].date).toLocaleDateString() : 'N/A';
+        khataList.innerHTML = visible.length === 0 ? '<tr class="empty-row"><td colspan="6" class="text-center">No parties found</td></tr>' : visible.map(c => {
+            const lastTx = [...(c.transactions || [])].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+            const lastDate = lastTx ? formatDisplayDate(lastTx.date) : 'N/A';
             const tel = String(c.phone || '').replace(/[^0-9+]/g, '');
+            const role = partyRoleLabel(c);
             return `
             <tr class="customer-row" data-id="${c.id}">
                 <td class="cell-muted"><strong>${c.khataNo}</strong></td>
-                <td class="cell-title">${c.name}</td>
-                <td class="cell-sub">${c.phone}</td>
+                <td class="cell-title">${escapeHtml(c.name)} <span class="party-pill ${partyRole(c)}">${role}</span></td>
+                <td class="cell-sub">${escapeHtml(c.phone || '—')}</td>
                 <td class="cell-meta"><span class="mobile-inline">Khata #${c.khataNo} · </span>${lastDate}</td>
-                <td class="cell-amount ${c.balance >= 0 ? 'text-success' : 'text-danger'}">
+                <td class="cell-amount ${c.balance > 0 ? 'text-danger' : c.balance < 0 ? 'text-success' : ''}">
                     ${currency} ${Math.abs(c.balance).toLocaleString()}
                     <div class="cell-balance-hint">${c.balance > 0 ? 'Has to pay you' : c.balance < 0 ? 'You have to pay' : 'Clear'}</div>
                 </td>
                 <td class="cell-actions">
                     <div class="table-actions">
                         <button class="btn-text btn-view-ledger" data-id="${c.id}" title="View Ledger">View</button>
+                        <button class="btn-text btn-add-ledger-entry" data-id="${c.id}" data-kind="credit" title="You Gave">Gave</button>
+                        <button class="btn-text btn-add-ledger-entry" data-id="${c.id}" data-kind="debit" title="You Got">Got</button>
                         ${tel ? `<a class="btn-icon btn-call" href="tel:${tel}" title="Call ${c.name}"><i class="fas fa-phone"></i></a>` : ''}
-                        <button class="btn-icon btn-whatsapp-direct no-print" data-id="${c.id}" title="Share on WhatsApp">
+                        <button class="btn-icon btn-whatsapp-direct no-print" data-id="${c.id}" title="Share statement">
                             <i class="fab fa-whatsapp"></i>
                         </button>
-                        <button class="btn-icon btn-edit-customer no-print" data-id="${c.id}" title="Edit Customer">
+                        <button class="btn-icon btn-edit-customer no-print" data-id="${c.id}" title="Edit Party">
                             <i class="fas fa-edit"></i>
                         </button>
                         <button class="btn-icon btn-print-direct no-print" data-id="${c.id}" title="Print Statement">

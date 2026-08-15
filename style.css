@@ -840,10 +840,109 @@ body.dark-theme .form-group.highlight {
     background-color: rgba(99, 102, 241, 0.05);
 }
 
-.form-hint {
-    margin-top: 0.5rem;
-    font-size: 0.8rem;
-    color: var(--text-muted);
+.gave-got-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    margin-bottom: 0.75rem;
+}
+
+.gave-got-btn {
+    min-height: 48px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-main);
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.gave-got-btn.gave.active,
+.gave-got-btn[data-khata-type="credit"].active {
+    background: color-mix(in srgb, var(--danger) 16%, var(--bg-card));
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.gave-got-btn.got.active,
+.gave-got-btn[data-khata-type="debit"].active {
+    background: color-mix(in srgb, var(--success) 16%, var(--bg-card));
+    border-color: var(--success);
+    color: var(--success);
+}
+
+.gave-got-btn[data-party-role].active {
+    background: color-mix(in srgb, var(--primary) 16%, var(--bg-card));
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.check-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0.4rem 0 1rem;
+    font-size: 0.9rem;
+    color: var(--text-main);
+}
+
+.ledger-quick {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+}
+
+.ledger-quick-btn {
+    min-height: 52px;
+    border-radius: 14px;
+    border: none;
+    font-weight: 800;
+    font-size: 1rem;
+    cursor: pointer;
+    color: #fff;
+}
+
+.ledger-quick-btn.gave {
+    background: #e11d48;
+}
+
+.ledger-quick-btn.got {
+    background: #059669;
+}
+
+.ledger-remind {
+    width: 100%;
+    justify-content: center;
+}
+
+.khata-filters {
+    display: flex;
+    gap: 0.45rem;
+    overflow-x: auto;
+    padding: 0 0 0.85rem;
+    scrollbar-width: none;
+}
+
+.khata-filters::-webkit-scrollbar { display: none; }
+
+.party-pill {
+    display: inline-block;
+    margin-left: 0.35rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 0.12rem 0.4rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
+    color: var(--primary);
+    vertical-align: middle;
+}
+
+.party-pill.supplier {
+    background: color-mix(in srgb, var(--accent, #b8892a) 18%, transparent);
+    color: var(--accent, #b8892a);
 }
 
 /* Ledger Modal */
