@@ -6,7 +6,7 @@
     <title>KhataBook Pro - Premium Ledger & Daily Cash Book</title>
     <meta name="description" content="Professional Khata Book and Rooznamcha with free cloud accounts for shops worldwide.">
     <meta name="theme-color" content="#0d7377">
-    <meta name="application-version" content="1.9.11">
+    <meta name="application-version" content="1.10.0">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="KhataPro">
@@ -22,7 +22,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.9.11">
+    <link rel="stylesheet" href="style.css?v=1.10.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -87,6 +87,10 @@
                 <a href="#" class="nav-link" data-view="rooznamcha">
                     <i class="fas fa-book"></i>
                     <span>Daily Book</span>
+                </a>
+                <a href="#" class="nav-link" data-view="stock">
+                    <i class="fas fa-boxes-stacked"></i>
+                    <span>Stock</span>
                 </a>
                 <a href="#" class="nav-link" data-view="reports">
                     <i class="fas fa-file-invoice-dollar"></i>
@@ -301,6 +305,46 @@
                             <input type="search" id="customer-search" placeholder="Search name or phone..." enterkeyhint="search" autocomplete="off">
                         </div>
                         <div id="customers-list" class="party-list"></div>
+                    </div>
+                </section>
+
+                <section id="stock-view" class="view">
+                    <div class="view-header">
+                        <div class="header-main">
+                            <h2>Stock</h2>
+                            <p class="hide-on-mobile">Add items, then tap In or Out. Low stock is marked automatically.</p>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-add-stock hide-on-mobile" aria-label="Add item">
+                            <i class="fas fa-plus"></i>
+                            <span>Add Item</span>
+                        </button>
+                    </div>
+
+                    <div class="daily-summary-bar no-print" id="stock-summary-bar">
+                        <div class="day-stat net">
+                            <span class="label">Items</span>
+                            <span class="value" id="stock-count">0</span>
+                        </div>
+                        <div class="day-stat income">
+                            <span class="label">Stock value</span>
+                            <span class="value" id="stock-value">0</span>
+                        </div>
+                        <div class="day-stat expense">
+                            <span class="label">Low / Out</span>
+                            <span class="value" id="stock-alerts">0</span>
+                        </div>
+                    </div>
+
+                    <div class="content-card">
+                        <div class="party-toolbar">
+                            <div class="khata-filters" id="stock-filters">
+                                <button type="button" class="preset-chip active" data-stock-filter="all">All</button>
+                                <button type="button" class="preset-chip" data-stock-filter="low">Low</button>
+                                <button type="button" class="preset-chip" data-stock-filter="out">Out</button>
+                            </div>
+                            <input type="search" id="stock-search" placeholder="Search item..." enterkeyhint="search" autocomplete="off">
+                        </div>
+                        <div id="stock-list" class="stock-list"></div>
                     </div>
                 </section>
 
@@ -581,6 +625,10 @@
                     <span>Party</span>
                     <span class="fab-action-icon customer"><i class="fas fa-user-plus"></i></span>
                 </button>
+                <button type="button" class="fab-action btn-add-stock">
+                    <span>Stock</span>
+                    <span class="fab-action-icon stock"><i class="fas fa-boxes-stacked"></i></span>
+                </button>
             </div>
             <button type="button" class="mobile-fab" id="btn-mobile-fab" aria-label="Add new" aria-expanded="false">
                 <i class="fas fa-plus"></i>
@@ -600,9 +648,9 @@
                 <i class="fas fa-book"></i>
                 <span>Daily</span>
             </button>
-            <button type="button" class="bottom-nav-item" data-view="reports">
-                <i class="fas fa-file-invoice-dollar"></i>
-                <span>Reports</span>
+            <button type="button" class="bottom-nav-item" data-view="stock">
+                <i class="fas fa-boxes-stacked"></i>
+                <span>Stock</span>
             </button>
             <button type="button" class="bottom-nav-item" id="btn-bottom-menu" data-view="menu">
                 <i class="fas fa-bars"></i>
@@ -629,8 +677,8 @@
     <!-- Print Containers -->
     <div id="ledger-print-container"></div>
 
-    <script src="site-config.js?v=1.9.11"></script>
-    <script src="cloud-auth.js?v=1.9.11"></script>
-    <script src="app.js?v=1.9.11"></script>
+    <script src="site-config.js?v=1.10.0"></script>
+    <script src="cloud-auth.js?v=1.10.0"></script>
+    <script src="app.js?v=1.10.0"></script>
 </body>
 </html>

@@ -294,8 +294,9 @@ const AccountCloud = {
         const customers = Array.isArray(data.customers) ? data.customers : [];
         const rooz = Array.isArray(data.rooznamcha) ? data.rooznamcha : [];
         const trash = Array.isArray(data.trash) ? data.trash : [];
+        const stock = Array.isArray(data.stock) ? data.stock : [];
         const tx = customers.reduce((n, c) => n + (Array.isArray(c.transactions) ? c.transactions.length : 0), 0);
-        return customers.length * 10 + rooz.length * 5 + tx + trash.length;
+        return customers.length * 10 + rooz.length * 5 + tx + trash.length + stock.length * 4;
     },
 
     sanitizeData(data) {
@@ -305,6 +306,7 @@ const AccountCloud = {
             return {
                 customers: [],
                 rooznamcha: [],
+                stock: [],
                 trash: [],
                 settings: { shopName: 'My Business', currency: 'Rs.', language: 'en', nextKhataNo: 1, nextTransactionNo: 1001 }
             };
@@ -325,6 +327,7 @@ const AccountCloud = {
                     if (remoteWeight >= localWeight && remoteWeight > 0) {
                         db.data = remote;
                         if (!db.data.trash) db.data.trash = [];
+                        if (!Array.isArray(db.data.stock)) db.data.stock = [];
                         if (!db.data.settings) {
                             db.data.settings = {
                                 shopName: 'My Business',

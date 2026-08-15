@@ -19,7 +19,8 @@ const translations = {
         addExpense: 'Add Expense',
         home: 'Home',
         dailyShort: 'Daily',
-        menu: 'Menu'
+        menu: 'Menu',
+        stock: 'Stock'
     },
     ur: {
         dashboard: 'ÚˆÛŒØ´ Ø¨ÙˆØ±Úˆ',
@@ -37,7 +38,8 @@ const translations = {
         addExpense: 'Ø§Ø®Ø±Ø§Ø¬Ø§Øª Ø´Ø§Ù…Ù„ Ú©Ø±ÛŒÚº',
         home: 'Home',
         dailyShort: 'Daily',
-        menu: 'Menu'
+        menu: 'Menu',
+        stock: 'سٹاک'
     }
 };
 
@@ -54,6 +56,7 @@ class DataManager {
         this.data = JSON.parse(localStorage.getItem('khata-data')) || {
             customers: [],
             rooznamcha: [],
+            stock: [],
             trash: [], // New Trash collection
             settings: {
                 shopName: 'My Business',
@@ -71,6 +74,7 @@ class DataManager {
 
         // Ensure defaults...
         if (!this.data.trash) this.data.trash = [];
+        if (!Array.isArray(this.data.stock)) this.data.stock = [];
         if (!this.data.settings.nextKhataNo) this.data.settings.nextKhataNo = 1;
         if (!this.data.settings.nextTransactionNo) this.data.settings.nextTransactionNo = 1001;
         if (!this.data.settings.language) this.data.settings.language = 'en';
@@ -286,6 +290,9 @@ class DataManager {
                     customer.balance += (khataType === 'credit' ? entry.amount : -entry.amount);
                 }
             }
+        } else if (trashItem.type === 'stock') {
+            if (!Array.isArray(this.data.stock)) this.data.stock = [];
+            this.data.stock.push(trashItem.data);
         }
         this.save();
     }
@@ -295,6 +302,77 @@ class DataManager {
             this.data.trash = [];
             this.save();
         }
+    }
+
+    addStockItem({ name, unit, qty, minQty, buyPrice, sellPrice }) {
+        if (!Array.isArray(this.data.stock)) this.data.stock = [];
+        const item = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            name,
+            unit: unit || 'pcs',
+            qty: Number(qty) || 0,
+            minQty: Number(minQty) || 0,
+            buyPrice: Number(buyPrice) || 0,
+            sellPrice: Number(sellPrice) || 0,
+            createdAt: nowStamp()
+        };
+        this.data.stock.push(item);
+        this.save();
+        return item.id;
+    }
+
+    updateStockItem(id, fields) {
+        const item = this.data.stock.find(s => s.id == id);
+        if (!item) return;
+        if (fields.name != null) item.name = fields.name;
+        if (fields.unit != null) item.unit = fields.unit;
+        if (fields.minQty != null) item.minQty = Number(fields.minQty) || 0;
+        if (fields.buyPrice != null) item.buyPrice = Number(fields.buyPrice) || 0;
+        if (fields.sellPrice != null) item.sellPrice = Number(fields.sellPrice) || 0;
+        if (fields.qty != null) item.qty = Number(fields.qty) || 0;
+        this.save();
+    }
+
+    adjustStock(id, delta, note = '') {
+        const item = this.data.stock.find(s => s.id == id);
+        if (!item) return false;
+        const next = (Number(item.qty) || 0) + Number(delta);
+        if (next < 0) return false;
+        item.qty = next;
+        item.lastMove = { delta: Number(delta), note: note || '', date: nowStamp() };
+        this.save();
+        return true;
+    }
+
+    deleteStockItem(id) {
+        if (!Array.isArray(this.data.stock)) return;
+        const index = this.data.stock.findIndex(s => s.id == id);
+        if (index === -1) return;
+        const item = this.data.stock.splice(index, 1)[0];
+        this.data.trash.push({
+            id: Date.now().toString(),
+            originalId: item.id,
+            type: 'stock',
+            data: item,
+            deletedAt: new Date().toISOString()
+        });
+        this.save();
+    }
+
+    getStockStats() {
+        const list = Array.isArray(this.data.stock) ? this.data.stock : [];
+        let value = 0;
+        let low = 0;
+        let out = 0;
+        list.forEach(item => {
+            const qty = Number(item.qty) || 0;
+            const minQty = Number(item.minQty) || 0;
+            const buy = Number(item.buyPrice) || 0;
+            value += qty * buy;
+            if (qty <= 0) out += 1;
+            else if (minQty > 0 && qty <= minQty) low += 1;
+        });
+        return { count: list.length, value, low, out };
     }
 
     // Calculations
@@ -431,6 +509,7 @@ class DataManager {
         setNavText('khata', t.khata);
         setNavText('rooznamcha', t.rooznamcha);
         setNavText('reports', t.reports);
+        setNavText('stock', t.stock || 'Stock');
         setNavText('settings', t.settings);
         setNavText('trash', t.trash);
 
@@ -440,6 +519,7 @@ class DataManager {
         setBottomText('dashboard', t.home || 'Home');
         setBottomText('khata', t.khata);
         setBottomText('rooznamcha', t.dailyShort || t.rooznamcha);
+        setBottomText('stock', t.stock || 'Stock');
         setBottomText('reports', t.reports);
         const menuSpan = document.querySelector('#btn-bottom-menu span');
         if (menuSpan) menuSpan.innerText = t.menu || 'Menu';
@@ -476,6 +556,7 @@ class DataManager {
             this.data = {
                 customers: [],
                 rooznamcha: [],
+                stock: [],
                 trash: [],
                 settings: {
                     shopName: this.data.settings.shopName || 'My Business',
@@ -559,6 +640,7 @@ class DataManager {
             this.data = {
                 customers: imported.customers,
                 rooznamcha: imported.rooznamcha,
+                stock: Array.isArray(imported.stock) ? imported.stock : [],
                 trash: Array.isArray(imported.trash) ? imported.trash : [],
                 settings: { ...defaults, ...(imported.settings || {}) }
             };
@@ -824,6 +906,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 let cashflowChart = null;
 let distributionChart = null;
 let khataPartyFilter = 'all';
+let stockFilter = 'all';
 
 async function initApp() {
     applySiteConfig();
@@ -1077,6 +1160,7 @@ function setupSearchHandlers() {
         if (khataList) {
             filterPartyList(query);
         }
+        filterStockList(query);
         
         console.log(`Global search for: ${query}`, { customers: filteredCustomers.length, transactions: filteredTransactions.length });
     });
@@ -1095,6 +1179,22 @@ function setupSearchHandlers() {
         updateCustomerLists();
         const query = document.getElementById('customer-search')?.value?.toLowerCase();
         if (query) filterPartyList(query);
+    });
+
+    document.getElementById('stock-search')?.addEventListener('input', (e) => {
+        filterStockList(e.target.value.toLowerCase());
+    });
+
+    document.getElementById('stock-filters')?.addEventListener('click', (e) => {
+        const chip = e.target.closest('[data-stock-filter]');
+        if (!chip) return;
+        stockFilter = chip.dataset.stockFilter || 'all';
+        document.querySelectorAll('#stock-filters [data-stock-filter]').forEach(btn => {
+            btn.classList.toggle('active', btn === chip);
+        });
+        updateStockList();
+        const query = document.getElementById('stock-search')?.value?.toLowerCase();
+        if (query) filterStockList(query);
     });
 }
 
@@ -1843,6 +1943,17 @@ function setupModalHandlers() {
 
         if (target.classList.contains('btn-add-customer')) {
             openModal('Add Party', 'add-customer');
+        } else if (target.classList.contains('btn-add-stock')) {
+            openModal('Add Item', 'stock-item');
+        } else if (target.classList.contains('btn-edit-stock')) {
+            const item = db.data.stock.find(s => s.id == target.dataset.id);
+            if (item) openModal('Edit Item', 'stock-item', item);
+        } else if (target.classList.contains('btn-stock-in')) {
+            const item = db.data.stock.find(s => s.id == target.dataset.id);
+            if (item) openModal(`Stock In — ${item.name}`, 'stock-move', { ...item, direction: 'in' });
+        } else if (target.classList.contains('btn-stock-out')) {
+            const item = db.data.stock.find(s => s.id == target.dataset.id);
+            if (item) openModal(`Stock Out — ${item.name}`, 'stock-move', { ...item, direction: 'out' });
         } else if (target.classList.contains('btn-add-income')) {
             openModal('Add Income', 'add-income');
         } else if (target.classList.contains('btn-add-expense')) {
@@ -1901,6 +2012,13 @@ function setupModalHandlers() {
                 db.deleteCustomer(customerId);
                 showUndoToast('Party deleted');
                 closeModal();
+                updateUI();
+            }
+        } else if (target.closest('.btn-delete-stock')) {
+            const stockId = target.closest('.btn-delete-stock').dataset.id;
+            if (confirm('Delete this stock item?')) {
+                db.deleteStockItem(stockId);
+                showUndoToast('Item deleted');
                 updateUI();
             }
         }
@@ -2169,6 +2287,68 @@ function renderForm(type, data = null) {
         }
         case 'view-ledger':
             return `<div id="ledger-statement-view"></div>`;
+        case 'stock-item': {
+            const isEdit = !!(data && data.id);
+            const unit = data?.unit || 'pcs';
+            return `
+                <div class="form-group">
+                    <label>Item name</label>
+                    <input type="text" name="name" required placeholder="e.g. Sugar, Oil, Cement" value="${data ? escapeHtml(data.name) : ''}" autofocus>
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label>Unit</label>
+                        <select name="unit">
+                            <option value="pcs" ${unit === 'pcs' ? 'selected' : ''}>Pcs</option>
+                            <option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kg</option>
+                            <option value="ltr" ${unit === 'ltr' ? 'selected' : ''}>Litre</option>
+                            <option value="box" ${unit === 'box' ? 'selected' : ''}>Box</option>
+                            <option value="mtr" ${unit === 'mtr' ? 'selected' : ''}>Meter</option>
+                        </select>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label>${isEdit ? 'Current qty' : 'Opening qty'}</label>
+                        <input type="number" name="qty" inputmode="decimal" step="0.01" min="0" placeholder="0" value="${data ? data.qty : ''}">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label>Low stock alert</label>
+                        <input type="number" name="minQty" inputmode="decimal" step="0.01" min="0" placeholder="0" value="${data ? data.minQty : ''}">
+                    </div>
+                    <div class="form-group flex-1">
+                        <label>Buy price</label>
+                        <input type="number" name="buyPrice" inputmode="decimal" step="0.01" min="0" placeholder="0" value="${data ? data.buyPrice : ''}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Sell price (optional)</label>
+                    <input type="number" name="sellPrice" inputmode="decimal" step="0.01" min="0" placeholder="0" value="${data ? data.sellPrice : ''}">
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">${isEdit ? 'Update Item' : 'Save Item'}</button>
+                </div>
+            `;
+        }
+        case 'stock-move': {
+            const goingIn = data?.direction !== 'out';
+            const unit = data?.unit || 'pcs';
+            return `
+                <p class="form-hint">Now in stock: <strong>${formatAmount(data?.qty || 0)} ${escapeHtml(unit)}</strong></p>
+                <div class="form-group">
+                    <label>${goingIn ? 'Qty in' : 'Qty out'}</label>
+                    <input type="number" name="qty" inputmode="decimal" step="0.01" min="0.01" required placeholder="0" autofocus>
+                    <input type="hidden" name="direction" value="${goingIn ? 'in' : 'out'}">
+                </div>
+                <div class="form-group">
+                    <label>Note (optional)</label>
+                    <input type="text" name="note" placeholder="Bill no, supplier, or reason">
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">${goingIn ? 'Add to stock' : 'Take from stock'}</button>
+                </div>
+            `;
+        }
         default: return '';
     }
 }
@@ -2395,6 +2575,35 @@ function handleFormSubmit(formData) {
         openModal('Account Statement', 'view-ledger');
         renderLedgerStatement(customerId);
         return false;
+    } else if (type === 'stock-item') {
+        const name = formData.get('name')?.trim();
+        if (!name) { showToast('Item name is required.', 'error'); return false; }
+        const payload = {
+            name,
+            unit: formData.get('unit') || 'pcs',
+            qty: formData.get('qty'),
+            minQty: formData.get('minQty'),
+            buyPrice: formData.get('buyPrice'),
+            sellPrice: formData.get('sellPrice')
+        };
+        if (editId) {
+            db.updateStockItem(editId, payload);
+            showToast('Item updated.', 'success');
+        } else {
+            db.addStockItem(payload);
+            showToast('Item added to stock.', 'success');
+        }
+    } else if (type === 'stock-move') {
+        const qty = parseFloat(formData.get('qty'));
+        if (isNaN(qty) || qty <= 0) { showToast('Enter a quantity greater than 0.', 'error'); return false; }
+        const itemId = form.dataset.editId;
+        const goingIn = formData.get('direction') !== 'out';
+        const ok = db.adjustStock(itemId, goingIn ? qty : -qty, formData.get('note')?.trim() || '');
+        if (!ok) {
+            showToast('Not enough stock for this out.', 'error');
+            return false;
+        }
+        showToast(goingIn ? 'Stock in saved.' : 'Stock out saved.', 'success');
     }
     return true;
 }
@@ -2412,6 +2621,7 @@ function updateUI(dateFilter = null, searchQuery = "") {
     updateStatsDisplay(stats);
     updateRooznamchaLists(effectiveDateFilter, searchQuery);
     updateCustomerLists();
+    updateStockList();
     updateTrashList();
     updateCharts();
     updateReportsPage();
@@ -2425,8 +2635,9 @@ function updateTrashList() {
     trashList.innerHTML = db.data.trash.slice().reverse().map(item => {
         let details = '';
         if (item.type === 'customer') {
-            // Fix: Ensure we use item.data for customer name and khata no
             details = `<strong>Customer:</strong> ${item.data.name} (Khata: ${item.data.khataNo})`;
+        } else if (item.type === 'stock') {
+            details = `<strong>Stock:</strong> ${item.data.name || 'Item'} (${item.data.qty || 0} ${item.data.unit || 'pcs'})`;
         } else {
             // Fix: Handle transaction data properly
             const amount = item.data.amount ? item.data.amount.toLocaleString() : '0';
@@ -2654,6 +2865,80 @@ function updateCustomerLists() {
         `;
         }).join('');
     }
+}
+
+function stockStatus(item) {
+    const qty = Number(item.qty) || 0;
+    const minQty = Number(item.minQty) || 0;
+    if (qty <= 0) return 'out';
+    if (minQty > 0 && qty <= minQty) return 'low';
+    return 'ok';
+}
+
+function filterStockList(query) {
+    const q = (query || '').toLowerCase();
+    document.querySelectorAll('#stock-list .stock-item').forEach(row => {
+        row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+}
+
+function updateStockList() {
+    const listEl = document.getElementById('stock-list');
+    if (!listEl) return;
+    const currency = db.data.settings.currency || 'Rs.';
+    const stats = db.getStockStats();
+    const countEl = document.getElementById('stock-count');
+    const valueEl = document.getElementById('stock-value');
+    const alertsEl = document.getElementById('stock-alerts');
+    if (countEl) countEl.textContent = String(stats.count);
+    if (valueEl) valueEl.textContent = formatMoney(stats.value, currency);
+    if (alertsEl) alertsEl.textContent = String(stats.low + stats.out);
+
+    const items = [...(db.data.stock || [])].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    const visible = items.filter(item => {
+        const status = stockStatus(item);
+        if (stockFilter === 'low') return status === 'low';
+        if (stockFilter === 'out') return status === 'out';
+        return true;
+    });
+
+    if (!visible.length) {
+        listEl.innerHTML = '<p class="empty-state">No stock items yet. Tap Add Item to start.</p>';
+        return;
+    }
+
+    listEl.innerHTML = visible.map(item => {
+        const qty = Number(item.qty) || 0;
+        const unit = item.unit || 'pcs';
+        const status = stockStatus(item);
+        const value = qty * (Number(item.buyPrice) || 0);
+        const badge = status === 'out' ? 'Out' : status === 'low' ? 'Low' : 'In stock';
+        return `
+            <div class="stock-item ${status}">
+                <div class="stock-item-main">
+                    <div class="stock-item-top">
+                        <strong class="stock-item-name">${escapeHtml(item.name)}</strong>
+                        <span class="stock-badge ${status}">${badge}</span>
+                    </div>
+                    <div class="stock-item-meta">
+                        Buy ${escapeHtml(currency)} ${formatAmount(item.buyPrice || 0)}
+                        ${item.sellPrice ? ` · Sell ${escapeHtml(currency)} ${formatAmount(item.sellPrice)}` : ''}
+                        ${value ? ` · Value ${escapeHtml(currency)} ${formatAmount(value)}` : ''}
+                    </div>
+                </div>
+                <div class="stock-item-qty">
+                    <strong>${formatAmount(qty)}</strong>
+                    <span>${escapeHtml(unit)}</span>
+                </div>
+                <div class="stock-item-actions">
+                    <button type="button" class="btn-stock-in" data-id="${item.id}">In</button>
+                    <button type="button" class="btn-stock-out" data-id="${item.id}">Out</button>
+                    <button type="button" class="btn-icon btn-edit-stock" data-id="${item.id}" title="Edit" aria-label="Edit item"><i class="fas fa-pen"></i></button>
+                    <button type="button" class="btn-delete btn-delete-stock" data-id="${item.id}" title="Delete" aria-label="Delete item"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 function showToast(message, type = 'info') {
