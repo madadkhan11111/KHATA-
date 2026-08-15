@@ -112,7 +112,7 @@ h1, h2, h3, h4 {
     gap: 0.5rem;
 }
 
-.mobile-sidebar-close {
+.btn-icon.mobile-sidebar-close {
     display: none;
     background: rgba(255, 255, 255, 0.08);
     color: #e8f2ef;
@@ -2013,7 +2013,7 @@ body.rtl .form-row {
         display: none !important;
     }
 
-    .mobile-sidebar-close {
+    .btn-icon.mobile-sidebar-close {
         display: inline-flex;
         width: 40px;
         height: 40px;
