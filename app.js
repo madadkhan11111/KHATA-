@@ -472,7 +472,7 @@ class DataManager {
     }
 
     resetData() {
-        if (confirm('Are you SURE you want to delete ALL data? This cannot be undone.')) {
+        if (confirm('Delete ALL parties and Daily Book entries? Dashboard totals will become 0. This cannot be undone.')) {
             this.data = {
                 customers: [],
                 rooznamcha: [],
@@ -487,6 +487,8 @@ class DataManager {
                     openingCash: 0
                 }
             };
+            this.undoStack = [];
+            this.redoStack = [];
             localStorage.setItem('khata-data', JSON.stringify(this.data));
             const finish = () => location.reload();
             if (window.AccountCloud && AccountCloud.user) {
@@ -975,9 +977,12 @@ function updateCharts() {
     cashflowChart.update();
 
     const stats = db.getStats();
+    const cashSlice = Math.max(0, Number(stats.cashInHand) || 0);
+    const recSlice = Math.max(0, Number(stats.totalReceivables) || 0);
+    const paySlice = Math.max(0, Number(stats.totalPayables) || 0);
     distributionChart.data.labels = ['Cash', 'Receivables', 'Payables'];
     distributionChart.data.datasets = [{
-        data: [stats.cashInHand, stats.totalReceivables, stats.totalPayables],
+        data: [cashSlice, recSlice, paySlice],
         backgroundColor: [primaryColor, successColor, dangerColor],
         borderWidth: 0
     }];
@@ -1996,7 +2001,7 @@ function setKhataEntryKind(kind) {
     } else {
         if (hint) hint.textContent = 'Jama: cash this party paid you, or goods they gave you.';
         if (cashLabel) cashLabel.textContent = 'Also add cash in Daily Book';
-        if (cash) cash.checked = true;
+        if (cash) cash.checked = false;
         if (save) save.textContent = 'Save Jama';
     }
 }
@@ -2154,7 +2159,7 @@ function renderForm(type, data = null) {
                     <input type="date" name="entryDate" value="${today}" required>
                 </div>
                 <label class="check-row">
-                    <input type="checkbox" name="alsoCash" ${kind === 'debit' ? 'checked' : ''}>
+                    <input type="checkbox" name="alsoCash">
                     <span id="khata-cash-label">${kind === 'debit' ? 'Also add cash in Daily Book' : 'This was cash given (add to Daily Book)'}</span>
                 </label>
                 <div class="modal-footer">
