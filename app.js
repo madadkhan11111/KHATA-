@@ -158,7 +158,7 @@ class DataManager {
                 amount,
                 type,
                 description,
-                date: dateISO || new Date().toISOString(),
+                date: dateISO || nowStamp(),
                 linkedId
             };
             customer.transactions.push(entry);
@@ -181,7 +181,7 @@ class DataManager {
             type, // income or expense
             category,
             description,
-            date: dateISO || new Date().toISOString(),
+            date: dateISO || nowStamp(),
             customerId // Link to Khata if provided
         };
         this.data.rooznamcha.push(entry);
@@ -300,14 +300,15 @@ class DataManager {
         
         let cashInHand = 0;
         this.data.rooznamcha.forEach(entry => {
-            if (entry.type === 'income') cashInHand += entry.amount;
-            else cashInHand -= entry.amount;
+            const amount = Number(entry.amount) || 0;
+            if (entry.type === 'income') cashInHand += amount;
+            else cashInHand -= amount;
         });
         return { totalReceivables, totalPayables, cashInHand };
     }
 
     getTodayStats() {
-        const today = typeof localISODate === 'function' ? localISODate() : new Date().toISOString().split('T')[0];
+        const today = localISODate();
         return this.getFilteredStats(today, today);
     }
 
@@ -316,10 +317,10 @@ class DataManager {
         let expense = 0;
         
         this.data.rooznamcha.forEach(entry => {
-            const entryDate = entry.date.split('T')[0];
+            const entryDate = entryLocalDate(entry.date);
             if ((!startDate || entryDate >= startDate) && (!endDate || entryDate <= endDate)) {
-                if (entry.type === 'income') income += entry.amount;
-                else expense += entry.amount;
+                if (entry.type === 'income') income += Number(entry.amount) || 0;
+                else expense += Number(entry.amount) || 0;
             }
         });
         
@@ -327,13 +328,14 @@ class DataManager {
     }
 
     getFilteredRooznamcha(dateFilter) {
-        if (!dateFilter) return [...this.data.rooznamcha].reverse();
-        return this.data.rooznamcha.filter(entry => entry.date.startsWith(dateFilter)).reverse();
+        const list = [...this.data.rooznamcha].reverse();
+        if (!dateFilter) return list;
+        return list.filter(entry => entryLocalDate(entry.date) === dateFilter);
     }
 
     getRangeRooznamcha(startDate, endDate) {
         return this.data.rooznamcha.filter(entry => {
-            const entryDate = (entry.date || '').split('T')[0];
+            const entryDate = entryLocalDate(entry.date);
             if (startDate && entryDate < startDate) return false;
             if (endDate && entryDate > endDate) return false;
             return true;
@@ -716,6 +718,30 @@ function localISODate(date = new Date()) {
     return `${y}-${m}-${d}`;
 }
 
+function entryLocalDate(value) {
+    if (!value) return '';
+    const s = String(value);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const parsed = new Date(s);
+    if (!Number.isNaN(parsed.getTime())) return localISODate(parsed);
+    const part = s.split('T')[0];
+    return /^\d{4}-\d{2}-\d{2}$/.test(part) ? part : '';
+}
+
+function nowStamp() {
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return `${localISODate(d)}T${hh}:${mm}:${ss}`;
+}
+
+function weekdayFromKey(key) {
+    const [y, m, day] = String(key).split('-').map(Number);
+    if (!y || !m || !day) return '';
+    return new Date(y, m - 1, day).toLocaleDateString(undefined, { weekday: 'short' });
+}
+
 function partyRole(party) {
     return party?.role === 'supplier' ? 'supplier' : 'customer';
 }
@@ -725,7 +751,7 @@ function partyRoleLabel(party) {
 }
 
 function dateToISO(dateValue) {
-    if (!dateValue) return new Date().toISOString();
+    if (!dateValue) return nowStamp();
     if (String(dateValue).includes('T')) return dateValue;
     return `${dateValue}T12:00:00`;
 }
@@ -737,16 +763,16 @@ function getCashTrendPercent() {
     for (let i = 0; i < 7; i++) {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
-        const key = d.toISOString().split('T')[0];
+        const key = localISODate(d);
         current += db.getFilteredStats(key, key).net;
     }
     for (let i = 7; i < 14; i++) {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
-        const key = d.toISOString().split('T')[0];
+        const key = localISODate(d);
         previous += db.getFilteredStats(key, key).net;
     }
-    if (previous === 0) return current === 0 ? 0 : 100;
+    if (previous === 0) return null;
     return Math.round(((current - previous) / Math.abs(previous)) * 100);
 }
 
@@ -799,7 +825,7 @@ async function initApp() {
     if (versionEl) versionEl.textContent = `v${APP_VERSION}`;
     initCharts();
     db.applyLanguage();
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = localISODate();
     const roozDateFilter = document.getElementById('rooznamcha-date-filter');
     if (roozDateFilter && !roozDateFilter.value) roozDateFilter.value = todayStr;
     updateUI();
@@ -904,13 +930,13 @@ function updateCharts() {
     const last7Days = [...Array(7)].map((_, i) => {
         const d = new Date();
         d.setDate(d.getDate() - (6 - i));
-        return d.toISOString().split('T')[0];
+        return localISODate(d);
     });
 
     const incomeData = last7Days.map(date => db.getFilteredStats(date, date).income);
     const expenseData = last7Days.map(date => db.getFilteredStats(date, date).expense);
 
-    cashflowChart.data.labels = last7Days.map(d => new Date(d).toLocaleDateString(undefined, { weekday: 'short' }));
+    cashflowChart.data.labels = last7Days.map(weekdayFromKey);
     cashflowChart.data.datasets = [
         { 
             label: 'Income', 
@@ -1810,7 +1836,7 @@ function setupModalHandlers() {
             const customerId = target.closest('.btn-whatsapp-direct').dataset.id;
             shareOnWhatsApp(customerId);
         } else if (target.id === 'btn-print-rooznamcha' || target.id === 'btn-print-rooznamcha-mobile') {
-            const dateFilter = document.getElementById('rooznamcha-date-filter')?.value || new Date().toISOString().split('T')[0];
+            const dateFilter = document.getElementById('rooznamcha-date-filter')?.value || localISODate();
             printRoozReport(dateFilter);
         } else if (target.closest('.btn-print-direct')) {
             const customerId = target.closest('.btn-print-direct').dataset.id;
@@ -2344,7 +2370,7 @@ function handleFormSubmit(formData) {
  */
 function updateUI(dateFilter = null, searchQuery = "") {
     const roozDateFilter = document.getElementById('rooznamcha-date-filter');
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = localISODate();
     if (roozDateFilter && !roozDateFilter.value) roozDateFilter.value = todayStr;
     const effectiveDateFilter = dateFilter ?? (roozDateFilter?.value || null);
 
@@ -2418,7 +2444,7 @@ function updateStatsDisplay(stats) {
     const trendValueEl = document.getElementById('cash-trend-value');
     if (trendEl && trendValueEl) {
         const pct = getCashTrendPercent();
-        const hasData = db.data.rooznamcha.length > 0;
+        const hasData = db.data.rooznamcha.length > 0 && pct !== null;
         if (!hasData) {
             trendEl.hidden = true;
         } else {
@@ -2447,7 +2473,7 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
     if (!recentList && !rooznamchaList) return;
 
     // Daily Summary Stats
-    const displayDate = dateFilter || new Date().toISOString().split('T')[0];
+    const displayDate = dateFilter || localISODate();
     const todayStats = db.getFilteredStats(displayDate, displayDate);
     const todayIncomeEl = document.getElementById('today-income');
     const todayExpenseEl = document.getElementById('today-expense');
@@ -2479,7 +2505,7 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
             <tr class="entry-row" data-id="${t.id}">
                 <td class="cell-meta">
                     <div style="font-size: 0.75rem; color: var(--text-muted);">#${t.transactionNo || 'N/A'} (Pg ${t.pageNo || '1'})</div>
-                    ${new Date(t.date).toLocaleString()}
+                    ${formatDisplayDate(t.date)}
                 </td>
                 <td class="cell-title">
                     <div>${t.description || 'No description'}</div>
@@ -2513,7 +2539,7 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
         const customer = t.customerId ? db.data.customers.find(c => c.id === t.customerId) : null;
         return `
             <tr class="entry-row" data-id="${t.id}">
-                <td class="cell-meta">${new Date(t.date).toLocaleDateString()}</td>
+                <td class="cell-meta">${formatDisplayDate(t.date)}</td>
                 <td class="cell-title">
                     <div>${t.description || 'No description'}</div>
                     ${customer ? `<div style="margin-top: 5px; color: var(--primary); font-size: 0.85rem;">${customer.name}</div>` : ''}
