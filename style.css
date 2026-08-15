@@ -920,11 +920,96 @@ body.dark-theme .form-group.highlight {
     justify-content: center;
 }
 
+.party-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.party-toolbar .khata-filters {
+    padding: 0;
+    flex: 1;
+    min-width: 0;
+}
+
+.party-toolbar #customer-search {
+    width: min(260px, 100%);
+    height: 42px;
+    padding: 0 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-main);
+    color: var(--text-main);
+}
+
+.party-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.party-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    text-align: left;
+    padding: 0.95rem 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--bg-card);
+    color: inherit;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.party-item:hover {
+    border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+}
+
+.party-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.party-item-name {
+    font-weight: 700;
+    font-size: 1.02rem;
+}
+
+.party-item-sub {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.party-item-balance {
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.party-item-balance strong {
+    display: block;
+    font-size: 1.05rem;
+}
+
+.party-item-balance span {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.party-item-balance.due strong { color: var(--danger); }
+.party-item-balance.pay strong { color: var(--primary); }
+
 .khata-filters {
     display: flex;
     gap: 0.45rem;
     overflow-x: auto;
-    padding: 0 0 0.85rem;
     scrollbar-width: none;
 }
 
@@ -2648,6 +2733,16 @@ body.rtl .form-row {
 
     .search-bar input {
         padding: 0.8rem 1rem 0.8rem 2.7rem;
+    }
+
+    .party-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .party-toolbar #customer-search {
+        width: 100%;
+    }
         min-height: 46px;
         border-radius: 999px;
     }

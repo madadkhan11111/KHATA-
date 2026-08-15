@@ -974,6 +974,13 @@ function setupSettingsHandlers() {
     if (window.AccountCloud) AccountCloud.updateAccountWidgets();
 }
 
+function filterPartyList(query) {
+    const q = (query || '').toLowerCase();
+    document.querySelectorAll('#customers-list .party-item').forEach(row => {
+        row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+}
+
 /**
  * Search Management
  */
@@ -1009,23 +1016,14 @@ function setupSearchHandlers() {
         // If we are in Khata view, filter that too
         const khataList = document.getElementById('customers-list');
         if (khataList) {
-            const rows = khataList.querySelectorAll('tr');
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(query) ? '' : 'none';
-            });
+            filterPartyList(query);
         }
         
         console.log(`Global search for: ${query}`, { customers: filteredCustomers.length, transactions: filteredTransactions.length });
     });
 
     customerSearch?.addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase();
-        const rows = document.querySelectorAll('#customers-list tr');
-        rows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            row.style.display = text.includes(query) ? '' : 'none';
-        });
+        filterPartyList(e.target.value.toLowerCase());
     });
 
     document.getElementById('khata-filters')?.addEventListener('click', (e) => {
@@ -1037,11 +1035,7 @@ function setupSearchHandlers() {
         });
         updateCustomerLists();
         const query = document.getElementById('customer-search')?.value?.toLowerCase();
-        if (query) {
-            document.querySelectorAll('#customers-list tr').forEach(row => {
-                row.style.display = row.textContent.toLowerCase().includes(query) ? '' : 'none';
-            });
-        }
+        if (query) filterPartyList(query);
     });
 }
 
@@ -1749,6 +1743,13 @@ function setupModalHandlers() {
             return;
         }
 
+        const partyItem = e.target.closest('.party-item');
+        if (partyItem?.dataset.id) {
+            openModal('Account Statement', 'view-ledger');
+            renderLedgerStatement(partyItem.dataset.id);
+            return;
+        }
+
         const reportEntry = e.target.closest('.report-entry');
         if (reportEntry?.dataset.id) {
             const entry = db.data.rooznamcha.find(en => en.id == reportEntry.dataset.id);
@@ -1764,7 +1765,7 @@ function setupModalHandlers() {
                 renderLedgerStatement(miniCust.dataset.id);
                 return;
             }
-            const customerRow = e.target.closest('tr.customer-row');
+            const customerRow = e.target.closest('tr.customer-row, .party-item');
             if (customerRow?.dataset.id) {
                 openModal('Account Statement', 'view-ledger');
                 renderLedgerStatement(customerRow.dataset.id);
@@ -1837,9 +1838,10 @@ function setupModalHandlers() {
             }
         } else if (target.closest('.btn-delete-customer')) {
             const customerId = target.closest('.btn-delete-customer').dataset.id;
-            if (confirm("CAUTION: Are you sure you want to delete this customer? All their ledger history will be lost!")) {
+            if (confirm("Delete this party and their khata history?")) {
                 db.deleteCustomer(customerId);
-                showUndoToast('Customer Deleted');
+                showUndoToast('Party deleted');
+                closeModal();
                 updateUI();
             }
         }
@@ -2118,6 +2120,7 @@ function renderLedgerStatement(customerId) {
 
     const { customer, currency, shopName, rows, totalGave, totalGot, period } = model;
     const result = statementResult(model);
+    const tel = String(customer.phone || '').replace(/[^0-9+]/g, '');
     const rowHtml = rows.length
         ? rows.map(row => `
             <tr>
@@ -2209,15 +2212,11 @@ function renderLedgerStatement(customerId) {
             </div>
             <div class="ledger-cards ledger-mobile">${cardHtml}</div>
             <div class="modal-footer no-print ledger-actions">
-                <button type="button" class="btn btn-secondary" onclick="copyLedgerAsText('${customerId}')">
-                    <i class="fas fa-copy"></i> Copy
-                </button>
-                <button type="button" class="btn btn-secondary" onclick="shareOnWhatsApp('${customerId}')">
-                    <i class="fab fa-whatsapp"></i> WhatsApp
-                </button>
-                <button type="button" class="btn btn-primary" onclick="printLedgerStatement('${customerId}')">
-                    <i class="fas fa-print"></i> Print / PDF
-                </button>
+                ${tel ? `<a class="btn btn-secondary" href="tel:${tel}">Call</a>` : ''}
+                <button type="button" class="btn btn-secondary btn-edit-customer" data-id="${customerId}">Edit</button>
+                <button type="button" class="btn btn-secondary" onclick="shareOnWhatsApp('${customerId}')">WhatsApp</button>
+                <button type="button" class="btn btn-primary" onclick="printLedgerStatement('${customerId}')">Print</button>
+                <button type="button" class="btn-text btn-delete-customer" data-id="${customerId}">Delete</button>
             </div>
         </div>
     `;
@@ -2567,42 +2566,20 @@ function updateCustomerLists() {
     }
 
     if (khataList) {
-        khataList.innerHTML = visible.length === 0 ? '<tr class="empty-row"><td colspan="6" class="text-center">No parties found</td></tr>' : visible.map(c => {
-            const lastTx = [...(c.transactions || [])].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-            const lastDate = lastTx ? formatDisplayDate(lastTx.date) : 'N/A';
-            const tel = String(c.phone || '').replace(/[^0-9+]/g, '');
-            const role = partyRoleLabel(c);
+        khataList.innerHTML = visible.length === 0 ? '<p class="empty-state">No parties found.</p>' : visible.map(c => {
+            const status = c.balance > 0 ? 'Has to pay you' : c.balance < 0 ? 'You have to pay' : 'Clear';
+            const tone = c.balance > 0 ? 'due' : c.balance < 0 ? 'pay' : 'clear';
             return `
-            <tr class="customer-row" data-id="${c.id}">
-                <td class="cell-muted"><strong>${c.khataNo}</strong></td>
-                <td class="cell-title">${escapeHtml(c.name)} <span class="party-pill ${partyRole(c)}">${role}</span></td>
-                <td class="cell-sub">${escapeHtml(c.phone || '—')}</td>
-                <td class="cell-meta"><span class="mobile-inline">Khata #${c.khataNo} · </span>${lastDate}</td>
-                <td class="cell-amount ${c.balance > 0 ? 'text-danger' : c.balance < 0 ? 'text-success' : ''}">
-                    ${currency} ${Math.abs(c.balance).toLocaleString()}
-                    <div class="cell-balance-hint">${c.balance > 0 ? 'Has to pay you' : c.balance < 0 ? 'You have to pay' : 'Clear'}</div>
-                </td>
-                <td class="cell-actions">
-                    <div class="table-actions">
-                        <button class="btn-text btn-view-ledger" data-id="${c.id}" title="View Ledger">View</button>
-                        <button class="btn-text btn-add-ledger-entry" data-id="${c.id}" data-kind="credit" title="You Gave">Gave</button>
-                        <button class="btn-text btn-add-ledger-entry" data-id="${c.id}" data-kind="debit" title="You Got">Got</button>
-                        ${tel ? `<a class="btn-icon btn-call" href="tel:${tel}" title="Call ${c.name}"><i class="fas fa-phone"></i></a>` : ''}
-                        <button class="btn-icon btn-whatsapp-direct no-print" data-id="${c.id}" title="Share statement">
-                            <i class="fab fa-whatsapp"></i>
-                        </button>
-                        <button class="btn-icon btn-edit-customer no-print" data-id="${c.id}" title="Edit Party">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn-icon btn-print-direct no-print" data-id="${c.id}" title="Print Statement">
-                            <i class="fas fa-print"></i>
-                        </button>
-                        <button class="btn-delete btn-delete-customer no-print" data-id="${c.id}">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>
+            <button type="button" class="party-item customer-row" data-id="${c.id}">
+                <div class="party-item-info">
+                    <span class="party-item-name">${escapeHtml(c.name)}</span>
+                    <span class="party-item-sub">${escapeHtml(c.phone || partyRoleLabel(c))} · Khata #${escapeHtml(c.khataNo)}</span>
+                </div>
+                <div class="party-item-balance ${tone}">
+                    <strong>${escapeHtml(currency)} ${formatAmount(Math.abs(c.balance))}</strong>
+                    <span>${status}</span>
+                </div>
+            </button>
         `;
         }).join('');
     }

@@ -6,7 +6,7 @@
     <title>KhataBook Pro - Premium Ledger & Daily Cash Book</title>
     <meta name="description" content="Professional Khata Book and Rooznamcha with free cloud accounts for shops worldwide.">
     <meta name="theme-color" content="#0d7377">
-    <meta name="application-version" content="1.9.1">
+    <meta name="application-version" content="1.9.2">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="KhataPro">
@@ -22,7 +22,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.9.1">
+    <link rel="stylesheet" href="style.css?v=1.9.2">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -279,45 +279,26 @@
                     <div class="view-header">
                         <div class="header-main">
                             <h2>Khata</h2>
-                            <p class="hide-on-mobile">Customers and suppliers — You Gave, You Got, and pending amounts.</p>
+                            <p class="hide-on-mobile">Tap a name to open the account. Use You Gave and You Got there.</p>
                         </div>
-                        <button class="btn btn-primary btn-add-customer hide-on-mobile">
+                        <button type="button" class="btn btn-primary btn-add-customer hide-on-mobile" aria-label="Add party">
                             <i class="fas fa-user-plus"></i>
                             <span>Add Party</span>
                         </button>
                     </div>
 
                     <div class="content-card">
-                        <div class="card-header">
-                            <h3>All Parties</h3>
-                            <div class="filter-group">
-                                <input type="text" id="customer-search" placeholder="Search by name or phone...">
+                        <div class="party-toolbar">
+                            <div class="khata-filters" id="khata-filters">
+                                <button type="button" class="preset-chip active" data-khata-filter="all">All</button>
+                                <button type="button" class="preset-chip" data-khata-filter="collect">To Collect</button>
+                                <button type="button" class="preset-chip" data-khata-filter="pay">To Pay</button>
+                                <button type="button" class="preset-chip" data-khata-filter="customer">Customers</button>
+                                <button type="button" class="preset-chip" data-khata-filter="supplier">Suppliers</button>
                             </div>
+                            <input type="search" id="customer-search" placeholder="Search name or phone..." enterkeyhint="search" autocomplete="off">
                         </div>
-                        <div class="khata-filters" id="khata-filters">
-                            <button type="button" class="preset-chip active" data-khata-filter="all">All</button>
-                            <button type="button" class="preset-chip" data-khata-filter="collect">To Collect</button>
-                            <button type="button" class="preset-chip" data-khata-filter="pay">To Pay</button>
-                            <button type="button" class="preset-chip" data-khata-filter="customer">Customers</button>
-                            <button type="button" class="preset-chip" data-khata-filter="supplier">Suppliers</button>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Khata No</th>
-                                        <th>Name</th>
-                                        <th>Phone</th>
-                                        <th>Last Transaction</th>
-                                        <th>Current Balance</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="customers-list">
-                                    <!-- Populated by JS -->
-                                </tbody>
-                            </table>
-                        </div>
+                        <div id="customers-list" class="party-list"></div>
                     </div>
                 </section>
 
@@ -634,8 +615,8 @@
     <!-- Print Containers -->
     <div id="ledger-print-container"></div>
 
-    <script src="site-config.js?v=1.9.1"></script>
-    <script src="cloud-auth.js?v=1.9.1"></script>
-    <script src="app.js?v=1.9.1"></script>
+    <script src="site-config.js?v=1.9.2"></script>
+    <script src="cloud-auth.js?v=1.9.2"></script>
+    <script src="app.js?v=1.9.2"></script>
 </body>
 </html>
