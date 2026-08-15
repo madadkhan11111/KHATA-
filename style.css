@@ -695,6 +695,25 @@ body.dark-theme .nav-link:hover {
 .badge.income { background-color: rgba(16, 185, 129, 0.1); color: var(--success); }
 .badge.expense { background-color: rgba(239, 68, 68, 0.1); color: var(--danger); }
 
+.khata-side-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin-right: 6px;
+}
+.khata-side-badge.banam {
+    background: color-mix(in srgb, var(--danger) 16%, transparent);
+    color: var(--danger);
+}
+.khata-side-badge.jama {
+    background: color-mix(in srgb, var(--success) 16%, transparent);
+    color: var(--success);
+}
+
 /* Customer Items in Dashboard */
 .customer-item {
     display: flex;

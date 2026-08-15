@@ -598,15 +598,21 @@ function formatAmount(amount) {
 }
 
 function balanceWords(balance, name = '') {
-    if (balance > 0) return name ? `${name} has to pay you` : 'Customer has to pay you';
-    if (balance < 0) return name ? `You have to pay ${name}` : 'You have to pay the customer';
+    if (balance > 0) return name ? `Banam — ${name} has to pay you` : 'Banam — they have to pay you';
+    if (balance < 0) return name ? `Jama — you have to pay ${name}` : 'Jama — you have to pay them';
     return 'Account is clear';
 }
 
 function balanceHint(balance) {
-    if (balance > 0) return 'pending from them';
-    if (balance < 0) return 'you have to pay';
-    return 'clear';
+    if (balance > 0) return 'Banam';
+    if (balance < 0) return 'Jama';
+    return 'Clear';
+}
+
+function banamJamaStatus(balance) {
+    if (balance > 0) return 'Banam';
+    if (balance < 0) return 'Jama';
+    return 'Clear';
 }
 
 function statementResult(model) {
@@ -615,17 +621,17 @@ function statementResult(model) {
     if (closing > 0) {
         return {
             tone: 'due',
-            label: `Pending from ${customer.name}`,
+            label: `Banam — pending from ${customer.name}`,
             amount,
-            explain: `${customer.name} still has to pay you this amount.`
+            explain: `${customer.name} has to pay you (Banam).`
         };
     }
     if (closing < 0) {
         return {
             tone: 'pay',
-            label: `You have to pay ${customer.name}`,
+            label: `Jama — you have to pay ${customer.name}`,
             amount,
-            explain: `You still have to pay ${customer.name} this amount.`
+            explain: `You have to pay ${customer.name} (Jama).`
         };
     }
     return {
@@ -666,7 +672,7 @@ function getLedgerStatementModel(customerId) {
             gave: isGave ? amount : 0,
             got: isGave ? 0 : amount,
             kind: isGave ? 'gave' : 'got',
-            kindLabel: isGave ? 'You gave' : 'You received',
+            kindLabel: isGave ? 'Banam' : 'Jama',
             balance: runningBalance,
             hint: balanceHint(runningBalance)
         };
@@ -712,8 +718,8 @@ function buildLedgerText(customerId, maxRows = 0) {
     });
     if (!rows.length) lines.push('No transactions on this account yet.');
     lines.push('');
-    lines.push(`Total you gave: ${currency} ${formatAmount(totalGave)}`);
-    lines.push(`Total you received: ${currency} ${formatAmount(totalGot)}`);
+    lines.push(`Total Banam: ${currency} ${formatAmount(totalGave)}`);
+    lines.push(`Total Jama: ${currency} ${formatAmount(totalGot)}`);
     lines.push(`${result.label}: ${result.amount}`);
     return lines.join('\n');
 }
@@ -1204,7 +1210,7 @@ function updateReportsPage(preset) {
                 <div class="customer-item" data-id="${c.id}" role="button" tabindex="0">
                     <div class="cust-info">
                         <span class="cust-name">${c.name}</span>
-                        <span class="cust-phone">${c.balance > 0 ? 'Has to pay you' : c.balance < 0 ? 'You have to pay' : 'Clear'}</span>
+                        <span class="cust-phone">${banamJamaStatus(c.balance)}</span>
                     </div>
                     <span class="cust-balance ${c.balance >= 0 ? 'plus' : 'minus'}">
                         ${formatMoney(Math.abs(c.balance), currency)}
@@ -1588,8 +1594,8 @@ function printLedgerStatement(customerId) {
                     <em>${escapeHtml(customer.phone || '')}</em>
                 </div>
                 <div class="ledger-print-totals-mini">
-                    <div><span>You gave</span><strong>${escapeHtml(currency)} ${formatAmount(totalGave)}</strong></div>
-                    <div><span>You received</span><strong>${escapeHtml(currency)} ${formatAmount(totalGot)}</strong></div>
+                    <div><span>Banam</span><strong>${escapeHtml(currency)} ${formatAmount(totalGave)}</strong></div>
+                    <div><span>Jama</span><strong>${escapeHtml(currency)} ${formatAmount(totalGot)}</strong></div>
                 </div>
             </div>
             <div class="ledger-print-result ${result.tone}">
@@ -1602,8 +1608,8 @@ function printLedgerStatement(customerId) {
                     <tr>
                         <th>Date</th>
                         <th>Details</th>
-                        <th class="num">You Gave (${escapeHtml(currency)})</th>
-                        <th class="num">You Received (${escapeHtml(currency)})</th>
+                        <th class="num">Banam (${escapeHtml(currency)})</th>
+                        <th class="num">Jama (${escapeHtml(currency)})</th>
                         <th class="num">Balance (${escapeHtml(currency)})</th>
                     </tr>
                 </thead>
@@ -1617,7 +1623,7 @@ function printLedgerStatement(customerId) {
                     </tr>
                 </tfoot>
             </table>
-            <p class="ledger-print-legend">You Gave = goods or cash you gave this customer. You Received = money this customer paid you.</p>
+            <p class="ledger-print-legend">Banam = you gave (they owe you). Jama = you received (they paid you).</p>
             <div class="ledger-print-signs">
                 <div>
                     <div class="sign-line"></div>
@@ -1983,15 +1989,15 @@ function setKhataEntryKind(kind) {
     const cash = document.querySelector('#main-form [name="alsoCash"]');
     const save = document.getElementById('khata-save-btn');
     if (type === 'credit') {
-        if (hint) hint.textContent = 'Goods or cash you gave this party. They will owe you more.';
+        if (hint) hint.textContent = 'Banam: goods or cash you gave. They will owe you more.';
         if (cashLabel) cashLabel.textContent = 'This was cash given (add to Daily Book)';
         if (cash) cash.checked = false;
-        if (save) save.textContent = 'Save You Gave';
+        if (save) save.textContent = 'Save Banam';
     } else {
-        if (hint) hint.textContent = 'Cash this party paid you, or goods they gave you.';
+        if (hint) hint.textContent = 'Jama: cash this party paid you, or goods they gave you.';
         if (cashLabel) cashLabel.textContent = 'Also add cash in Daily Book';
         if (cash) cash.checked = true;
-        if (save) save.textContent = 'Save You Got';
+        if (save) save.textContent = 'Save Jama';
     }
 }
 
@@ -2104,12 +2110,14 @@ function renderForm(type, data = null) {
                 </div>
 
                 <div class="form-group highlight">
-                    <label>Link to Khata (Customer Name)</label>
+                    <label>Link to Khata (Party)</label>
                     <select name="customerId">
-                        <option value="">-- Cash Transaction (No Khata) --</option>
+                        <option value="">-- Cash only (no party) --</option>
                         ${customerOptions}
                     </select>
-                    <p class="form-hint">Selecting a customer will automatically record this in their manual book (Khata).</p>
+                    <p class="form-hint">${realType === 'income'
+                        ? 'If you select a party, their khata is posted as Jama (they paid you).'
+                        : 'If you select a party, their khata is posted as Banam (you gave them cash).'}</p>
                 </div>
 
                 <div class="form-group">
@@ -2125,14 +2133,14 @@ function renderForm(type, data = null) {
             const kind = data?.kind === 'debit' ? 'debit' : 'credit';
             const today = localISODate();
             return `
-                <div class="gave-got-toggle" role="group" aria-label="You Gave or You Got">
-                    <button type="button" class="gave-got-btn gave ${kind === 'credit' ? 'active' : ''}" data-khata-type="credit">You Gave</button>
-                    <button type="button" class="gave-got-btn got ${kind === 'debit' ? 'active' : ''}" data-khata-type="debit">You Got</button>
+                <div class="gave-got-toggle" role="group" aria-label="Banam or Jama">
+                    <button type="button" class="gave-got-btn gave ${kind === 'credit' ? 'active' : ''}" data-khata-type="credit">Banam</button>
+                    <button type="button" class="gave-got-btn got ${kind === 'debit' ? 'active' : ''}" data-khata-type="debit">Jama</button>
                 </div>
                 <input type="hidden" name="type" id="khata-entry-type" value="${kind}">
                 <p class="form-hint" id="khata-entry-hint">${kind === 'credit'
-                    ? 'Goods or cash you gave this party. They will owe you more.'
-                    : 'Cash this party paid you, or goods they gave you.'}</p>
+                    ? 'Banam: goods or cash you gave. They will owe you more.'
+                    : 'Jama: cash this party paid you, or goods they gave you.'}</p>
                 <div class="form-group">
                     <label>Amount</label>
                     <input type="number" name="amount" inputmode="decimal" step="0.01" min="0" required placeholder="0.00" autofocus>
@@ -2150,7 +2158,7 @@ function renderForm(type, data = null) {
                     <span id="khata-cash-label">${kind === 'debit' ? 'Also add cash in Daily Book' : 'This was cash given (add to Daily Book)'}</span>
                 </label>
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary full-width" id="khata-save-btn">${kind === 'credit' ? 'Save You Gave' : 'Save You Got'}</button>
+                    <button type="submit" class="btn btn-primary full-width" id="khata-save-btn">${kind === 'credit' ? 'Save Banam' : 'Save Jama'}</button>
                 </div>
             `;
         }
@@ -2208,8 +2216,8 @@ function renderLedgerStatement(customerId) {
                 <p>${escapeHtml(result.explain)}</p>
             </div>
             <div class="ledger-quick no-print">
-                <button type="button" class="ledger-quick-btn gave" onclick="openKhataQuick('${customerId}','credit')">You Gave</button>
-                <button type="button" class="ledger-quick-btn got" onclick="openKhataQuick('${customerId}','debit')">You Got</button>
+                <button type="button" class="ledger-quick-btn gave" onclick="openKhataQuick('${customerId}','credit')">Banam</button>
+                <button type="button" class="ledger-quick-btn got" onclick="openKhataQuick('${customerId}','debit')">Jama</button>
             </div>
             ${result.tone !== 'clear' ? `
             <button type="button" class="btn btn-secondary ledger-remind no-print" onclick="remindOnWhatsApp('${customerId}')">
@@ -2227,9 +2235,9 @@ function renderLedgerStatement(customerId) {
                     <div class="ledger-party-sub">${escapeHtml(period)}</div>
                 </div>
                 <div>
-                    <span class="ledger-party-label">You gave</span>
+                    <span class="ledger-party-label">Banam</span>
                     <div class="ledger-party-value ledger-gave">${escapeHtml(currency)} ${formatAmount(totalGave)}</div>
-                    <div class="ledger-party-sub">You received ${escapeHtml(currency)} ${formatAmount(totalGot)}</div>
+                    <div class="ledger-party-sub">Jama ${escapeHtml(currency)} ${formatAmount(totalGot)}</div>
                 </div>
             </div>
             <div class="no-print ledger-search-wrap">
@@ -2241,8 +2249,8 @@ function renderLedgerStatement(customerId) {
                         <tr>
                             <th>Date</th>
                             <th>Details</th>
-                            <th class="num">You Gave</th>
-                            <th class="num">You Received</th>
+                            <th class="num">Banam</th>
+                            <th class="num">Jama</th>
                             <th class="num">Balance</th>
                         </tr>
                     </thead>
@@ -2284,7 +2292,7 @@ window.openKhataQuick = (customerId, kind) => {
     const customer = db.data.customers.find(c => c.id == customerId);
     if (!customer) return;
     const type = kind === 'debit' ? 'debit' : 'credit';
-    const title = type === 'credit' ? `You Gave — ${customer.name}` : `You Got — ${customer.name}`;
+    const title = type === 'credit' ? `Banam — ${customer.name}` : `Jama — ${customer.name}`;
     openModal(title, 'khata-entry', { customerId, kind: type });
 };
 
@@ -2370,14 +2378,14 @@ function handleFormSubmit(formData) {
         const customer = db.data.customers.find(c => c.id == customerId);
         if (!customer) { showToast('Party not found.', 'error'); return false; }
         const entryType = formData.get('type') === 'debit' ? 'debit' : 'credit';
-        const description = (formData.get('description') || '').trim() || (entryType === 'credit' ? 'You gave' : 'You got');
+        const description = (formData.get('description') || '').trim() || (entryType === 'credit' ? 'Banam' : 'Jama');
         const dateISO = dateToISO(formData.get('entryDate'));
         db.addKhataEntry(customerId, amount, entryType, description, null, dateISO);
         if (formData.get('alsoCash')) {
             const cashType = entryType === 'debit' ? 'income' : 'expense';
             db.addRooznamchaEntry(amount, cashType, 'Khata', `${customer.name}: ${description}`, null, dateISO);
         }
-        showToast(entryType === 'credit' ? 'You Gave saved.' : 'You Got saved.', 'success');
+        showToast(entryType === 'credit' ? 'Banam saved.' : 'Jama saved.', 'success');
         updateUI();
         openModal('Account Statement', 'view-ledger');
         renderLedgerStatement(customerId);
@@ -2532,6 +2540,7 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
                     <div>${t.description || 'No description'}</div>
                     ${customer ? `
                         <div style="margin-top: 5px;">
+                            <span class="khata-side-badge ${t.type === 'income' ? 'jama' : 'banam'}">${t.type === 'income' ? 'Jama' : 'Banam'}</span>
                             <span style="background: var(--primary); color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700;">KHATA NO: ${customer.khataNo}</span>
                             <span style="color: var(--primary); font-size: 0.85rem; margin-left: 5px;">${customer.name}</span>
                         </div>
@@ -2563,7 +2572,7 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
                 <td class="cell-meta">${formatDisplayDate(t.date)}</td>
                 <td class="cell-title">
                     <div>${t.description || 'No description'}</div>
-                    ${customer ? `<div style="margin-top: 5px; color: var(--primary); font-size: 0.85rem;">${customer.name}</div>` : ''}
+                    ${customer ? `<div style="margin-top: 5px; color: var(--primary); font-size: 0.85rem;"><span class="khata-side-badge ${t.type === 'income' ? 'jama' : 'banam'}">${t.type === 'income' ? 'Jama' : 'Banam'}</span> ${customer.name}</div>` : ''}
                 </td>
                 <td class="cell-sub"><span class="badge ${t.type}">${t.category}</span></td>
                 <td class="cell-amount ${t.type === 'income' ? 'text-success' : 'text-danger'}">
@@ -2603,7 +2612,7 @@ function updateCustomerLists() {
             <div class="customer-item" data-id="${c.id}" role="button" tabindex="0">
                 <div class="cust-info">
                     <span class="cust-name">${escapeHtml(c.name)}</span>
-                    <span class="cust-phone">${c.balance > 0 ? 'Has to pay you' : c.balance < 0 ? 'You have to pay' : 'Clear'}</span>
+                    <span class="cust-phone">${banamJamaStatus(c.balance)}</span>
                 </div>
                 <span class="cust-balance ${c.balance >= 0 ? 'plus' : 'minus'}">
                     ${currency} ${Math.abs(c.balance).toLocaleString()}
@@ -2614,7 +2623,7 @@ function updateCustomerLists() {
 
     if (khataList) {
         khataList.innerHTML = visible.length === 0 ? '<p class="empty-state">No parties found.</p>' : visible.map(c => {
-            const status = c.balance > 0 ? 'Has to pay you' : c.balance < 0 ? 'You have to pay' : 'Clear';
+            const status = banamJamaStatus(c.balance);
             const tone = c.balance > 0 ? 'due' : c.balance < 0 ? 'pay' : 'clear';
             return `
             <button type="button" class="party-item customer-row" data-id="${c.id}">
