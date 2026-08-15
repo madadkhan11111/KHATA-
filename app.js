@@ -555,6 +555,145 @@ function formatMoney(amount, currency) {
     return `${sym} ${Number(amount || 0).toLocaleString()}`;
 }
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function formatDisplayDate(value) {
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatAmount(amount) {
+    return Number(amount || 0).toLocaleString();
+}
+
+function balanceWords(balance, name = '') {
+    if (balance > 0) return name ? `${name} has to pay you` : 'Customer has to pay you';
+    if (balance < 0) return name ? `You have to pay ${name}` : 'You have to pay the customer';
+    return 'Account is clear';
+}
+
+function balanceHint(balance) {
+    if (balance > 0) return 'pending from them';
+    if (balance < 0) return 'you have to pay';
+    return 'clear';
+}
+
+function statementResult(model) {
+    const { closing, customer, currency } = model;
+    const amount = `${currency} ${formatAmount(Math.abs(closing))}`;
+    if (closing > 0) {
+        return {
+            tone: 'due',
+            label: `Pending from ${customer.name}`,
+            amount,
+            explain: `${customer.name} still has to pay you this amount.`
+        };
+    }
+    if (closing < 0) {
+        return {
+            tone: 'pay',
+            label: `You have to pay ${customer.name}`,
+            amount,
+            explain: `You still have to pay ${customer.name} this amount.`
+        };
+    }
+    return {
+        tone: 'clear',
+        label: 'Account is clear',
+        amount,
+        explain: 'Nothing is pending on this khata.'
+    };
+}
+
+function getLedgerStatementModel(customerId) {
+    const customer = db.data.customers.find(c => c.id == customerId);
+    if (!customer) return null;
+    const currency = db.data.settings.currency || 'Rs.';
+    const shopName = db.data.settings.shopName || 'My Business';
+    const ledger = [...(db.getCustomerLedger(customerId) || [])].sort((a, b) => {
+        const da = new Date(a.date).getTime();
+        const dbTime = new Date(b.date).getTime();
+        if (da !== dbTime) return da - dbTime;
+        return String(a.id).localeCompare(String(b.id));
+    });
+    let runningBalance = 0;
+    let totalGave = 0;
+    let totalGot = 0;
+    const rows = ledger.map(t => {
+        const isGave = t.type === 'credit';
+        const amount = Number(t.amount) || 0;
+        if (isGave) totalGave += amount;
+        else totalGot += amount;
+        runningBalance += isGave ? amount : -amount;
+        const original = t.linkedRooznamchaId
+            ? db.data.rooznamcha.find(r => r.id == t.linkedRooznamchaId)
+            : null;
+        return {
+            date: formatDisplayDate(t.date),
+            ref: original?.transactionNo ? String(original.transactionNo) : '',
+            description: String(t.description || 'No details').replace(/^\[Rooznamcha\]\s*/i, ''),
+            gave: isGave ? amount : 0,
+            got: isGave ? 0 : amount,
+            kind: isGave ? 'gave' : 'got',
+            kindLabel: isGave ? 'You gave' : 'You received',
+            balance: runningBalance,
+            hint: balanceHint(runningBalance)
+        };
+    });
+    const closing = rows.length ? rows[rows.length - 1].balance : 0;
+    const period = rows.length
+        ? `${rows[0].date} – ${rows[rows.length - 1].date}`
+        : formatDisplayDate(new Date());
+    return {
+        customer,
+        currency,
+        shopName,
+        rows,
+        totalGave,
+        totalGot,
+        closing,
+        period
+    };
+}
+
+function buildLedgerText(customerId, maxRows = 0) {
+    const model = getLedgerStatementModel(customerId);
+    if (!model) return '';
+    const { customer, currency, shopName, rows, totalGave, totalGot, period } = model;
+    const result = statementResult(model);
+    const shown = maxRows > 0 && rows.length > maxRows ? rows.slice(-maxRows) : rows;
+    const skipped = rows.length - shown.length;
+    const lines = [
+        `Account Statement — ${shopName}`,
+        `Customer: ${customer.name}`,
+        `Khata No: ${customer.khataNo}${customer.phone ? `  |  Phone: ${customer.phone}` : ''}`,
+        `Period: ${period}`,
+        '',
+        `${result.label}: ${result.amount}`,
+        result.explain,
+        ''
+    ];
+    if (skipped > 0) lines.push(`(...${skipped} earlier entries)`);
+    shown.forEach(row => {
+        const money = formatAmount(row.gave || row.got);
+        lines.push(`${row.date}  ${row.kindLabel} ${currency} ${money}  — ${row.description}`);
+        lines.push(`   Balance: ${currency} ${formatAmount(Math.abs(row.balance))} (${row.hint})`);
+    });
+    if (!rows.length) lines.push('No transactions on this account yet.');
+    lines.push('');
+    lines.push(`Total you gave: ${currency} ${formatAmount(totalGave)}`);
+    lines.push(`Total you received: ${currency} ${formatAmount(totalGot)}`);
+    lines.push(`${result.label}: ${result.amount}`);
+    return lines.join('\n');
+}
+
 function localISODate(date = new Date()) {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -977,7 +1116,7 @@ function updateReportsPage(preset) {
                 <div class="customer-item" data-id="${c.id}" role="button" tabindex="0">
                     <div class="cust-info">
                         <span class="cust-name">${c.name}</span>
-                        <span class="cust-phone">${c.balance >= 0 ? 'They will give' : 'You will give'}</span>
+                        <span class="cust-phone">${c.balance > 0 ? 'Has to pay you' : c.balance < 0 ? 'You have to pay' : 'Clear'}</span>
                     </div>
                     <span class="cust-balance ${c.balance >= 0 ? 'plus' : 'minus'}">
                         ${formatMoney(Math.abs(c.balance), currency)}
@@ -1043,8 +1182,8 @@ function printFullReport() {
             </div>
             <div class="print-summary-strong">
                 <div class="summary-box">
-                    <div class="summary-row"><span>They will give (Receivables):</span><span class="text-success">${formatMoney(account.totalReceivables, currency)}</span></div>
-                    <div class="summary-row"><span>You will give (Payables):</span><span class="text-danger">${formatMoney(account.totalPayables, currency)}</span></div>
+                    <div class="summary-row"><span>Pending from customers:</span><span class="text-success">${formatMoney(account.totalReceivables, currency)}</span></div>
+                    <div class="summary-row"><span>You have to pay:</span><span class="text-danger">${formatMoney(account.totalPayables, currency)}</span></div>
                     <div class="summary-row"><span>Cash in Hand:</span><span>${formatMoney(account.cashInHand, currency)}</span></div>
                     <div class="summary-row"><span>Period Cash In:</span><span class="text-success">${formatMoney(periodStats.income, currency)}</span></div>
                     <div class="summary-row"><span>Period Cash Out:</span><span class="text-danger">${formatMoney(periodStats.expense, currency)}</span></div>
@@ -1312,6 +1451,112 @@ function printRoozReport(dateFilter) {
     }
 }
 
+function printLedgerStatement(customerId) {
+    const model = getLedgerStatementModel(customerId);
+    const container = document.getElementById('ledger-print-container');
+    if (!model || !container) return;
+
+    const { customer, currency, shopName, rows, totalGave, totalGot, closing, period } = model;
+    const result = statementResult(model);
+    const generated = new Date().toLocaleString();
+    const closingAbs = formatAmount(Math.abs(closing));
+
+    const rowHtml = rows.length
+        ? rows.map((row, i) => `
+            <tr class="${i % 2 ? 'alt' : ''}">
+                <td>${escapeHtml(row.date)}</td>
+                <td class="particulars">
+                    <strong>${escapeHtml(row.kindLabel)}</strong>
+                    ${row.ref ? `<span class="ref">#${escapeHtml(row.ref)}</span>` : ''}
+                    <div>${escapeHtml(row.description)}</div>
+                </td>
+                <td class="num">${row.gave ? formatAmount(row.gave) : '—'}</td>
+                <td class="num">${row.got ? formatAmount(row.got) : '—'}</td>
+                <td class="num">
+                    ${formatAmount(Math.abs(row.balance))}
+                    <small>${escapeHtml(row.hint)}</small>
+                </td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="5" class="empty-cell">No transactions on this account yet.</td></tr>';
+
+    container.innerHTML = `
+        <div class="print-report ledger-print-report">
+            <div class="ledger-print-top">
+                <div>
+                    <div class="ledger-print-shop">${escapeHtml(shopName)}</div>
+                    <div class="ledger-print-title">Account Statement</div>
+                    <div class="ledger-print-period">From ${escapeHtml(period)}</div>
+                </div>
+                <div class="ledger-print-issued">
+                    <div>Printed: ${escapeHtml(formatDisplayDate(new Date()))}</div>
+                    <div>Khata No. ${escapeHtml(customer.khataNo)}</div>
+                </div>
+            </div>
+            <div class="ledger-print-party">
+                <div>
+                    <span>Customer</span>
+                    <strong>${escapeHtml(customer.name)}</strong>
+                    <em>${escapeHtml(customer.phone || '')}</em>
+                </div>
+                <div class="ledger-print-totals-mini">
+                    <div><span>You gave</span><strong>${escapeHtml(currency)} ${formatAmount(totalGave)}</strong></div>
+                    <div><span>You received</span><strong>${escapeHtml(currency)} ${formatAmount(totalGot)}</strong></div>
+                </div>
+            </div>
+            <div class="ledger-print-result ${result.tone}">
+                <span>${escapeHtml(result.label)}</span>
+                <strong>${escapeHtml(result.amount)}</strong>
+                <em>${escapeHtml(result.explain)}</em>
+            </div>
+            <table class="ledger-print-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Details</th>
+                        <th class="num">You Gave (${escapeHtml(currency)})</th>
+                        <th class="num">You Received (${escapeHtml(currency)})</th>
+                        <th class="num">Balance (${escapeHtml(currency)})</th>
+                    </tr>
+                </thead>
+                <tbody>${rowHtml}</tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="2">Total</td>
+                        <td class="num">${formatAmount(totalGave)}</td>
+                        <td class="num">${formatAmount(totalGot)}</td>
+                        <td class="num">${closingAbs}</td>
+                    </tr>
+                </tfoot>
+            </table>
+            <p class="ledger-print-legend">You Gave = goods or cash you gave this customer. You Received = money this customer paid you.</p>
+            <div class="ledger-print-signs">
+                <div>
+                    <div class="sign-line"></div>
+                    <span>Customer signature</span>
+                </div>
+                <div>
+                    <div class="sign-line"></div>
+                    <span>Shop signature</span>
+                </div>
+                <div class="generated">Printed: ${escapeHtml(generated)}</div>
+            </div>
+        </div>
+    `;
+
+    const cleanup = () => {
+        container.innerHTML = '';
+        document.body.classList.remove('printing-report');
+        window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    document.body.classList.add('printing-report');
+    window.print();
+    setTimeout(cleanup, 2500);
+}
+
+window.printLedgerStatement = printLedgerStatement;
+
 /**
  * Navigation & View Management
  */
@@ -1450,14 +1695,15 @@ function setupModalHandlers() {
 
         const interactive = e.target.closest('button, a, input, select, textarea, .table-actions');
         if (!interactive) {
+            const miniCust = e.target.closest('.customer-item');
             if (miniCust?.dataset.id) {
-                openModal('Customer Ledger Statement', 'view-ledger');
+                openModal('Account Statement', 'view-ledger');
                 renderLedgerStatement(miniCust.dataset.id);
                 return;
             }
             const customerRow = e.target.closest('tr.customer-row');
             if (customerRow?.dataset.id) {
-                openModal('Customer Ledger Statement', 'view-ledger');
+                openModal('Account Statement', 'view-ledger');
                 renderLedgerStatement(customerRow.dataset.id);
                 return;
             }
@@ -1491,7 +1737,7 @@ function setupModalHandlers() {
         } else if (target.classList.contains('btn-add-ledger-entry') || target.classList.contains('btn-view-ledger')) {
             const customerId = target.dataset.id;
             if (target.classList.contains('btn-view-ledger')) {
-                openModal('Customer Ledger Statement', 'view-ledger');
+                openModal('Account Statement', 'view-ledger');
                 renderLedgerStatement(customerId);
             } else {
                 const customer = db.data.customers.find(c => c.id === customerId);
@@ -1506,9 +1752,7 @@ function setupModalHandlers() {
             printRoozReport(dateFilter);
         } else if (target.closest('.btn-print-direct')) {
             const customerId = target.closest('.btn-print-direct').dataset.id;
-            openModal('Customer Ledger Statement', 'view-ledger');
-            renderLedgerStatement(customerId);
-            setTimeout(() => window.print(), 300); // Wait for modal to render
+            printLedgerStatement(customerId);
         } else if (target.id === 'btn-global-undo') {
             db.undo();
             updateUI();
@@ -1579,8 +1823,7 @@ function setupModalHandlers() {
     document.addEventListener('input', (e) => {
         if (e.target.id === 'ledger-search') {
             const query = e.target.value.toLowerCase();
-            const rows = document.querySelectorAll('.ledger-statement .data-table tbody tr');
-            rows.forEach(row => {
+            document.querySelectorAll('.ledger-statement tbody tr, .ledger-entry-card').forEach(row => {
                 const text = row.textContent.toLowerCase();
                 row.style.display = text.includes(query) ? '' : 'none';
             });
@@ -1636,6 +1879,7 @@ function openModal(title, type, data = null) {
     else delete form.dataset.editId;
 
     form.innerHTML = renderForm(type, data);
+    modal.querySelector('.modal-card')?.classList.toggle('modal-wide', type === 'view-ledger');
     modal.classList.add('active');
     document.body.classList.add('modal-open');
 }
@@ -1735,111 +1979,142 @@ function renderForm(type, data = null) {
                 </div>
             `;
         case 'view-ledger':
-            return `<div id="ledger-print-container"></div>`;
+            return `<div id="ledger-statement-view"></div>`;
         default: return '';
     }
 }
 
 function renderLedgerStatement(customerId) {
-    const currency = db.data.settings.currency || 'Rs.';
-    const customer = db.data.customers.find(c => c.id == customerId);
-    const ledger = db.getCustomerLedger(customerId);
-    const container = document.getElementById('ledger-print-container');
-    
-    if (!customer || !container) return;
+    const model = getLedgerStatementModel(customerId);
+    const container = document.getElementById('ledger-statement-view');
+    if (!model || !container) return;
 
-    let html = `
-        <div class="ledger-statement printable-area">
-            <div class="ledger-header-print">
-                <h2 style="text-align: center; border-bottom: 1.5px solid #000; padding-bottom: 5px; margin-bottom: 10px; font-size: 1.4rem; text-transform: uppercase;">Ledger Statement</h2>
-                <h3 style="text-align: center; margin-bottom: 15px; font-size: 1.1rem; color: #333;">${db.data.settings.shopName}</h3>
-            </div>
-            
-            <div class="no-print" style="margin-bottom: 15px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;">
-                <input type="text" id="ledger-search" placeholder="Search transactions..." style="width: 100%; height: 36px; padding: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: white; font-size: 0.9rem;">
-            </div>
+    const { customer, currency, shopName, rows, totalGave, totalGot, period } = model;
+    const result = statementResult(model);
+    const rowHtml = rows.length
+        ? rows.map(row => `
+            <tr>
+                <td>${escapeHtml(row.date)}</td>
+                <td>
+                    <div class="ledger-kind ${row.kind}">${escapeHtml(row.kindLabel)}</div>
+                    <div>${escapeHtml(row.description)}</div>
+                </td>
+                <td class="num ledger-gave">${row.gave ? formatAmount(row.gave) : '—'}</td>
+                <td class="num ledger-got">${row.got ? formatAmount(row.got) : '—'}</td>
+                <td class="num">
+                    ${formatAmount(Math.abs(row.balance))}
+                    <span class="cell-balance-hint">${escapeHtml(row.hint)}</span>
+                </td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="5" class="text-center">No transactions yet on this khata.</td></tr>';
 
-            <div class="ledger-summary-mini" style="display: flex; justify-content: space-between; margin-bottom: 15px; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem;">
-                <div><strong>Khata No:</strong> ${customer.khataNo}</div>
-                <div><strong>Customer:</strong> ${customer.name}</div>
-                <div><strong>Balance:</strong> <span class="${customer.balance >= 0 ? 'text-success' : 'text-danger'}" style="font-weight: bold;">${currency} ${Math.abs(customer.balance).toLocaleString()} ${customer.balance >= 0 ? '(Receivable)' : '(Payable)'}</span></div>
+    const cardHtml = rows.length
+        ? rows.map(row => `
+            <article class="ledger-entry-card ${row.kind}">
+                <div class="ledger-entry-top">
+                    <span>${escapeHtml(row.date)}</span>
+                    <span class="ledger-kind ${row.kind}">${escapeHtml(row.kindLabel)}</span>
+                </div>
+                <div class="ledger-entry-desc">${escapeHtml(row.description)}</div>
+                <div class="ledger-entry-amt ${row.kind}">${escapeHtml(currency)} ${formatAmount(row.gave || row.got)}</div>
+                <div class="ledger-entry-bal">Balance ${escapeHtml(currency)} ${formatAmount(Math.abs(row.balance))} · ${escapeHtml(row.hint)}</div>
+            </article>
+        `).join('')
+        : '<p class="empty-state">No transactions yet on this khata.</p>';
+
+    container.innerHTML = `
+        <div class="ledger-statement">
+            <div class="ledger-result ${result.tone}">
+                <span class="ledger-result-label">${escapeHtml(result.label)}</span>
+                <strong>${escapeHtml(result.amount)}</strong>
+                <p>${escapeHtml(result.explain)}</p>
             </div>
-            <div class="table-responsive">
-                <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+            <div class="ledger-party-card">
+                <div>
+                    <span class="ledger-party-label">Customer</span>
+                    <div class="ledger-party-value">${escapeHtml(customer.name)}</div>
+                    <div class="ledger-party-sub">${escapeHtml(customer.phone || shopName)}</div>
+                </div>
+                <div>
+                    <span class="ledger-party-label">Khata No</span>
+                    <div class="ledger-party-value">${escapeHtml(customer.khataNo)}</div>
+                    <div class="ledger-party-sub">${escapeHtml(period)}</div>
+                </div>
+                <div>
+                    <span class="ledger-party-label">You gave</span>
+                    <div class="ledger-party-value ledger-gave">${escapeHtml(currency)} ${formatAmount(totalGave)}</div>
+                    <div class="ledger-party-sub">You received ${escapeHtml(currency)} ${formatAmount(totalGot)}</div>
+                </div>
+            </div>
+            <div class="no-print ledger-search-wrap">
+                <input type="text" id="ledger-search" placeholder="Search date or details...">
+            </div>
+            <div class="table-responsive ledger-table-wrap ledger-desktop">
+                <table class="ledger-table">
                     <thead>
-                        <tr style="background: #f1f5f9;">
-                            <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: left;">Date</th>
-                            <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: left;">Trans #</th>
-                            <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: left;">Description</th>
-                            <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: right;">Credit (+)</th>
-                            <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: right;">Debit (-)</th>
-                            <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: right;">Balance</th>
+                        <tr>
+                            <th>Date</th>
+                            <th>Details</th>
+                            <th class="num">You Gave</th>
+                            <th class="num">You Received</th>
+                            <th class="num">Balance</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        ${(() => {
-                            let runningBalance = 0;
-                            return ledger.map(t => {
-                                runningBalance += (t.type === 'credit' ? t.amount : -t.amount);
-                                const original = db.data.rooznamcha.find(r => r.id == t.linkedRooznamchaId);
-                                const displayId = original ? `#${original.transactionNo}` : 'Direct';
-                                return `
-                                    <tr>
-                                        <td style="padding: 5px 8px; border: 1px solid #e2e8f0;">${new Date(t.date).toLocaleDateString()}</td>
-                                        <td style="padding: 5px 8px; border: 1px solid #e2e8f0; font-family: monospace; font-size: 0.75rem;">${displayId}</td>
-                                        <td style="padding: 5px 8px; border: 1px solid #e2e8f0;">${t.description}</td>
-                                        <td style="padding: 5px 8px; border: 1px solid #e2e8f0; text-align: right;" class="text-success">${t.type === 'credit' ? currency + ' ' + t.amount.toLocaleString() : '-'}</td>
-                                        <td style="padding: 5px 8px; border: 1px solid #e2e8f0; text-align: right;" class="text-danger">${t.type === 'debit' ? currency + ' ' + t.amount.toLocaleString() : '-'}</td>
-                                        <td style="padding: 5px 8px; border: 1px solid #e2e8f0; text-align: right; font-weight: 600;">
-                                            ${currency} ${Math.abs(runningBalance).toLocaleString()} ${runningBalance >= 0 ? 'Cr' : 'Dr'}
-                                        </td>
-                                    </tr>
-                                `;
-                            }).join('');
-                        })()}
-                        ${ledger.length === 0 ? '<tr><td colspan="6" style="padding: 15px; text-align: center; border: 1px solid #e2e8f0;">No transactions found</td></tr>' : ''}
-                    </tbody>
+                    <tbody>${rowHtml}</tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2">Total</td>
+                            <td class="num">${formatAmount(totalGave)}</td>
+                            <td class="num">${formatAmount(totalGot)}</td>
+                            <td class="num">${escapeHtml(result.amount)}</td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
-            <div class="modal-footer no-print" style="margin-top: 15px; display: flex; gap: 10px;">
-                <button class="btn btn-secondary" onclick="copyLedgerAsText('${customerId}')" style="flex: 1; height: 40px; font-size: 0.9rem;">
-                    <i class="fas fa-copy"></i> Copy as Text
+            <div class="ledger-cards ledger-mobile">${cardHtml}</div>
+            <div class="modal-footer no-print ledger-actions">
+                <button type="button" class="btn btn-secondary" onclick="copyLedgerAsText('${customerId}')">
+                    <i class="fas fa-copy"></i> Copy
                 </button>
-                <button class="btn btn-primary" onclick="window.print()" style="flex: 1; height: 40px; font-size: 0.9rem;">
-                    <i class="fas fa-print"></i> Print Statement
+                <button type="button" class="btn btn-secondary" onclick="shareOnWhatsApp('${customerId}')">
+                    <i class="fab fa-whatsapp"></i> WhatsApp
+                </button>
+                <button type="button" class="btn btn-primary" onclick="printLedgerStatement('${customerId}')">
+                    <i class="fas fa-print"></i> Print / PDF
                 </button>
             </div>
         </div>
     `;
-    container.innerHTML = html;
 }
 
 window.copyLedgerAsText = (customerId) => {
-    const customer = db.data.customers.find(c => c.id == customerId);
-    if (!customer) return;
-
-    const currency = db.data.settings.currency || 'Rs.';
-    const shopName = db.data.settings.shopName || 'Our Shop';
-    const balance = Math.abs(customer.balance).toLocaleString();
-    const status = customer.balance >= 0 ? 'Receivable' : 'Payable';
-    
-    let text = `*Ledger Statement: ${customer.name}*\n`;
-    text += `*Shop:* ${shopName}\n`;
-    text += `*Current Balance:* ${currency} ${balance} (${status})\n\n`;
-    text += `*Recent Transactions:*\n`;
-    
-    const ledger = db.getCustomerLedger(customerId).slice(-5);
-    ledger.forEach(t => {
-        text += `- ${new Date(t.date).toLocaleDateString()}: ${t.type === 'credit' ? '+' : '-'} ${currency} ${t.amount.toLocaleString()} (${t.description})\n`;
-    });
-
+    const text = buildLedgerText(customerId);
+    if (!text) return;
     navigator.clipboard.writeText(text).then(() => {
-        showToast('Statement copied to clipboard!', 'success');
+        showToast('Full statement copied.', 'success');
     }).catch(err => {
         console.error('Failed to copy:', err);
         showToast('Failed to copy statement.', 'error');
     });
 };
+
+function shareOnWhatsApp(customerId) {
+    const customer = db.data.customers.find(c => c.id == customerId);
+    if (!customer) return;
+    const text = buildLedgerText(customerId, 20);
+    if (!text) return;
+    const phoneNumber = String(customer.phone || '').replace(/[^0-9]/g, '');
+    const finalPhone = !phoneNumber
+        ? ''
+        : (phoneNumber.startsWith('92') || phoneNumber.length > 10 ? phoneNumber : `92${phoneNumber}`);
+    const encodedMessage = encodeURIComponent(text);
+    const url = finalPhone
+        ? `https://wa.me/${finalPhone}?text=${encodedMessage}`
+        : `https://wa.me/?text=${encodedMessage}`;
+    window.open(url, '_blank');
+}
+window.shareOnWhatsApp = shareOnWhatsApp;
 
 function handleFormSubmit(formData) {
     const form = document.getElementById('main-form');
@@ -1882,29 +2157,6 @@ function handleFormSubmit(formData) {
         showToast('Ledger entry added!', 'success');
     }
     return true;
-}
-
-function shareOnWhatsApp(customerId) {
-    const customer = db.data.customers.find(c => c.id == customerId);
-    if (!customer) return;
-
-    const currency = db.data.settings.currency || 'Rs.';
-    const shopName = db.data.settings.shopName || 'Our Shop';
-    const balance = Math.abs(customer.balance).toLocaleString();
-    const status = customer.balance >= 0 ? 'you owe us' : 'we owe you';
-    
-    const message = `*Khata Statement from ${shopName}*\n\n` +
-                    `Dear *${customer.name}*,\n` +
-                    `Your current balance is *${currency} ${balance}* (${status}).\n\n` +
-                    `Please contact us for details. Thank you!`;
-
-    const encodedMessage = encodeURIComponent(message);
-    const phoneNumber = customer.phone.replace(/[^0-9]/g, ''); // Remove non-numeric chars
-    
-    // Check if phone starts with a country code, if not assume a default or just use the number
-    const finalPhone = phoneNumber.startsWith('92') || phoneNumber.length > 10 ? phoneNumber : `92${phoneNumber}`;
-
-    window.open(`https://wa.me/${finalPhone}?text=${encodedMessage}`, '_blank');
 }
 
 /**
@@ -2138,7 +2390,7 @@ function updateCustomerLists() {
                 <td class="cell-meta"><span class="mobile-inline">Khata #${c.khataNo} · </span>${lastDate}</td>
                 <td class="cell-amount ${c.balance >= 0 ? 'text-success' : 'text-danger'}">
                     ${currency} ${Math.abs(c.balance).toLocaleString()}
-                    <div class="cell-balance-hint">${c.balance >= 0 ? 'They will give' : 'You will give'}</div>
+                    <div class="cell-balance-hint">${c.balance > 0 ? 'Has to pay you' : c.balance < 0 ? 'You have to pay' : 'Clear'}</div>
                 </td>
                 <td class="cell-actions">
                     <div class="table-actions">

@@ -754,6 +754,10 @@ body.dark-theme .nav-link:hover {
     overflow: hidden;
 }
 
+.modal-card.modal-wide {
+    max-width: 920px;
+}
+
 .modal-header {
     padding: 1.5rem;
     border-bottom: 1px solid var(--border);
@@ -846,7 +850,246 @@ body.dark-theme .form-group.highlight {
 .ledger-statement {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.9rem;
+}
+
+.ledger-result {
+    border-radius: var(--radius-md);
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--border);
+}
+
+.ledger-result-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+}
+
+.ledger-result strong {
+    display: block;
+    font-size: 1.7rem;
+    line-height: 1.2;
+    font-weight: 800;
+}
+
+.ledger-result p {
+    margin: 0.35rem 0 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.ledger-result.due {
+    background: color-mix(in srgb, var(--danger) 10%, var(--bg-card));
+    border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+
+.ledger-result.due strong,
+.ledger-result.due .ledger-result-label {
+    color: var(--danger);
+}
+
+.ledger-result.pay {
+    background: color-mix(in srgb, var(--primary) 10%, var(--bg-card));
+    border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+}
+
+.ledger-result.pay strong,
+.ledger-result.pay .ledger-result-label {
+    color: var(--primary);
+}
+
+.ledger-result.clear {
+    background: color-mix(in srgb, var(--success) 10%, var(--bg-card));
+    border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+}
+
+.ledger-result.clear strong,
+.ledger-result.clear .ledger-result-label {
+    color: var(--success);
+}
+
+.ledger-search-wrap input {
+    width: 100%;
+    height: 42px;
+    padding: 0 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-main);
+    color: var(--text-main);
+    font-size: 0.92rem;
+}
+
+.ledger-party-card {
+    display: grid;
+    grid-template-columns: 1.5fr 0.8fr 1.1fr;
+    gap: 0.85rem;
+    padding: 1rem 1.1rem;
+    background: var(--bg-main);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.ledger-party-label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.2rem;
+}
+
+.ledger-party-value {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.ledger-party-sub {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+}
+
+.ledger-party-balance {
+    text-align: right;
+}
+
+.ledger-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.ledger-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.ledger-table th,
+.ledger-table td {
+    padding: 0.7rem 0.8rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.ledger-table th {
+    background: var(--bg-main);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+}
+
+.ledger-table td {
+    border-top: 1px solid var(--border);
+    color: var(--text-main);
+}
+
+.ledger-table .num,
+.ledger-table th.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.ledger-table tfoot td {
+    font-weight: 700;
+    background: var(--bg-main);
+}
+
+.ledger-gave {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+.ledger-got {
+    color: var(--success);
+    font-weight: 700;
+}
+
+.ledger-kind {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 0.15rem;
+}
+
+.ledger-kind.gave { color: var(--danger); }
+.ledger-kind.got { color: var(--success); }
+
+.ledger-mobile { display: none; }
+
+.ledger-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.ledger-entry-card {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.85rem 0.95rem;
+    background: var(--bg-card);
+}
+
+.ledger-entry-card.gave {
+    border-left: 4px solid var(--danger);
+}
+
+.ledger-entry-card.got {
+    border-left: 4px solid var(--success);
+}
+
+.ledger-entry-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+}
+
+.ledger-entry-desc {
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.ledger-entry-amt {
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin-top: 0.3rem;
+}
+
+.ledger-entry-amt.gave { color: var(--danger); }
+.ledger-entry-amt.got { color: var(--success); }
+
+.ledger-entry-bal {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.ledger-actions {
+    margin-top: 0;
+    padding: 0;
+    border: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.ledger-actions .btn {
+    flex: 1;
+    min-height: 42px;
 }
 
 .ledger-summary-mini {
@@ -895,9 +1138,18 @@ body.dark-theme .form-group.highlight {
 .day-stat.net .value.negative { color: var(--danger); }
 
 /* Printing */
+#ledger-print-container {
+    display: none;
+}
+
 .ledger-header-print { display: none; }
 
 @media print {
+    @page {
+        size: A4;
+        margin: 12mm 12mm 14mm;
+    }
+
     /* 1. Reset Body and Layout */
     body { 
         background: white !important; 
@@ -928,7 +1180,8 @@ body.dark-theme .form-group.highlight {
     body.printing-report .top-bar,
     body.printing-report .bottom-nav,
     body.printing-report .mobile-fab-wrap,
-    body.printing-report .fab-backdrop {
+    body.printing-report .fab-backdrop,
+    body.printing-report .modal-overlay {
         display: none !important;
     }
     
@@ -941,6 +1194,8 @@ body.dark-theme .form-group.highlight {
         width: 100% !important;
         margin: 0 !important;
         padding: 0 !important;
+        background: #fff !important;
+        color: #000 !important;
     }
 
     /* 5. Force printable containers to take full page and be visible */
@@ -1008,7 +1263,7 @@ body.dark-theme .form-group.highlight {
         display: block !important;
         background: #fff !important;
         color: #000 !important;
-        padding: 1rem !important;
+        padding: 0 !important;
         font-family: 'Segoe UI', Arial, sans-serif !important;
         page-break-after: auto !important;
     }
@@ -1117,7 +1372,6 @@ body.dark-theme .form-group.highlight {
     .text-center { text-align: center !important; }
     .empty-cell { padding: 2rem !important; color: #999 !important; }
     .small-text { font-size: 0.65rem !important; width: 40px !important; }
-}
 
     /* 8. Show only printable sections */
     .printable-area {
@@ -1131,6 +1385,246 @@ body.dark-theme .form-group.highlight {
         text-align: center !important;
         margin-bottom: 2rem !important;
         border-bottom: 2px solid black !important;
+    }
+
+    .ledger-print-report {
+        color: #111 !important;
+        font-size: 11pt !important;
+        line-height: 1.45 !important;
+    }
+
+    .ledger-print-top {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: flex-start !important;
+        gap: 1.5rem !important;
+        border-bottom: 2px solid #111 !important;
+        padding-bottom: 0.7rem !important;
+        margin-bottom: 0.9rem !important;
+    }
+
+    .ledger-print-shop {
+        font-size: 18pt !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.02em !important;
+        margin: 0 !important;
+    }
+
+    .ledger-print-title {
+        font-size: 12pt !important;
+        font-weight: 700 !important;
+        margin: 0.15rem 0 0 !important;
+    }
+
+    .ledger-print-period,
+    .ledger-print-issued {
+        font-size: 9.5pt !important;
+        color: #222 !important;
+    }
+
+    .ledger-print-issued {
+        text-align: right !important;
+        white-space: nowrap !important;
+    }
+
+    .ledger-print-party {
+        display: flex !important;
+        justify-content: space-between !important;
+        gap: 1.5rem !important;
+        border: 1px solid #111 !important;
+        padding: 0.7rem 0.85rem !important;
+        margin-bottom: 0.85rem !important;
+    }
+
+    .ledger-print-party span,
+    .ledger-print-close span,
+    .ledger-print-totals-mini span,
+    .ledger-print-result span {
+        display: block !important;
+        font-size: 8pt !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.04em !important;
+        margin-bottom: 0.15rem !important;
+    }
+
+    .ledger-print-party strong,
+    .ledger-print-close strong {
+        display: block !important;
+        font-size: 13pt !important;
+        font-weight: 800 !important;
+    }
+
+    .ledger-print-party em,
+    .ledger-print-close em,
+    .ledger-print-result em {
+        display: block !important;
+        font-style: normal !important;
+        font-size: 9.5pt !important;
+        margin-top: 0.1rem !important;
+    }
+
+    .ledger-print-close {
+        text-align: right !important;
+        min-width: 180px !important;
+    }
+
+    .ledger-print-totals-mini {
+        display: flex !important;
+        gap: 1.5rem !important;
+        text-align: right !important;
+    }
+
+    .ledger-print-result {
+        border: 2px solid #111 !important;
+        padding: 0.75rem 0.9rem !important;
+        margin-bottom: 0.9rem !important;
+        page-break-inside: avoid !important;
+    }
+
+    .ledger-print-result strong {
+        display: block !important;
+        font-size: 18pt !important;
+        font-weight: 800 !important;
+        margin: 0.1rem 0 !important;
+    }
+
+    .ledger-print-result.due {
+        background: #fff1f2 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .ledger-print-result.pay {
+        background: #ecfeff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .ledger-print-result.clear {
+        background: #f0fdf4 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .ledger-print-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        margin: 0 0 0.85rem !important;
+    }
+
+    .ledger-print-table th,
+    .ledger-print-table td {
+        border: 1px solid #222 !important;
+        padding: 7px 8px !important;
+        font-size: 10pt !important;
+        color: #111 !important;
+        vertical-align: top !important;
+    }
+
+    .ledger-print-table thead {
+        display: table-header-group !important;
+    }
+
+    .ledger-print-table th {
+        background: #efefef !important;
+        font-size: 8.5pt !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.03em !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .ledger-print-table tbody tr {
+        page-break-inside: avoid !important;
+    }
+
+    .ledger-print-table tr.alt td {
+        background: #f7f7f7 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .ledger-print-table td.particulars {
+        word-break: break-word !important;
+    }
+
+    .ledger-print-table td.particulars strong {
+        display: block !important;
+        font-size: 8.5pt !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.03em !important;
+    }
+
+    .ledger-print-table td.particulars .ref {
+        font-weight: 600 !important;
+        margin-left: 0.35rem !important;
+        color: #444 !important;
+        font-size: 8.5pt !important;
+    }
+
+    .ledger-print-table td.ref {
+        white-space: nowrap !important;
+        font-variant-numeric: tabular-nums !important;
+    }
+
+    .ledger-print-table .num {
+        text-align: right !important;
+        font-variant-numeric: tabular-nums !important;
+        white-space: nowrap !important;
+        font-weight: 600 !important;
+    }
+
+    .ledger-print-table .num small {
+        display: block !important;
+        font-size: 7.5pt !important;
+        font-weight: 600 !important;
+        color: #444 !important;
+    }
+
+    .ledger-print-table tfoot td {
+        font-weight: 800 !important;
+        background: #efefef !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .ledger-print-summary {
+        border: 2px solid #111 !important;
+        padding: 0.7rem 0.9rem !important;
+        font-size: 13pt !important;
+        font-weight: 800 !important;
+        margin-bottom: 0.55rem !important;
+        page-break-inside: avoid !important;
+    }
+
+    .ledger-print-legend {
+        font-size: 9pt !important;
+        color: #222 !important;
+        margin: 0 0 1.25rem !important;
+        line-height: 1.4 !important;
+    }
+
+    .ledger-print-signs {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: flex-end !important;
+        gap: 1.5rem !important;
+        margin-top: 1.75rem !important;
+        page-break-inside: avoid !important;
+    }
+
+    .ledger-print-signs .sign-line {
+        width: 170px !important;
+        border-bottom: 1px solid #111 !important;
+        margin-bottom: 0.35rem !important;
+        height: 28px !important;
+    }
+
+    .ledger-print-signs span,
+    .ledger-print-signs .generated {
+        font-size: 8.5pt !important;
     }
 }
 
@@ -2458,9 +2952,28 @@ body.rtl .form-row {
         min-height: 48px;
     }
 
-    .ledger-summary-mini {
+    .ledger-summary-mini,
+    .ledger-party-card {
+        grid-template-columns: 1fr;
         flex-direction: column;
-        gap: 0.45rem;
+        gap: 0.7rem;
+        text-align: left;
+    }
+
+    .ledger-party-balance {
+        text-align: left;
+    }
+
+    .ledger-desktop {
+        display: none;
+    }
+
+    .ledger-mobile {
+        display: flex;
+    }
+
+    .ledger-actions {
+        flex-direction: column;
     }
 
     .auth-screen {
