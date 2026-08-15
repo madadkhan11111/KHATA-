@@ -2583,12 +2583,17 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
                 <td class="cell-amount ${t.type === 'income' ? 'text-success' : 'text-danger'}">
                     ${t.type === 'income' ? '+' : '-'} ${currency} ${t.amount.toLocaleString()}
                 </td>
+                <td class="cell-actions no-print">
+                    <button type="button" class="btn-delete btn-delete-entry" data-id="${t.id}" title="Delete" aria-label="Delete entry">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
             </tr>
         `;
     };
 
     if (recentList) {
-        recentList.innerHTML = recentTransactions.length === 0 ? '<tr class="empty-row"><td colspan="4" class="text-center">No recent transactions</td></tr>' : recentTransactions.slice(0, 5).map(renderRecentRow).join('');
+        recentList.innerHTML = recentTransactions.length === 0 ? '<tr class="empty-row"><td colspan="5" class="text-center">No recent transactions</td></tr>' : recentTransactions.slice(0, 5).map(renderRecentRow).join('');
     }
     if (rooznamchaList) {
         rooznamchaList.innerHTML = roozViewTransactions.length === 0 ? '<tr class="empty-row"><td colspan="6" class="text-center">No transactions recorded</td></tr>' : roozViewTransactions.map(renderRoozRow).join('');
@@ -2619,9 +2624,14 @@ function updateCustomerLists() {
                     <span class="cust-name">${escapeHtml(c.name)}</span>
                     <span class="cust-phone">${banamJamaStatus(c.balance)}</span>
                 </div>
-                <span class="cust-balance ${c.balance >= 0 ? 'plus' : 'minus'}">
-                    ${currency} ${Math.abs(c.balance).toLocaleString()}
-                </span>
+                <div class="cust-side">
+                    <span class="cust-balance ${c.balance >= 0 ? 'plus' : 'minus'}">
+                        ${currency} ${Math.abs(c.balance).toLocaleString()}
+                    </span>
+                    <button type="button" class="btn-delete btn-delete-customer" data-id="${c.id}" title="Delete party" aria-label="Delete party">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
             </div>
         `).join('');
     }

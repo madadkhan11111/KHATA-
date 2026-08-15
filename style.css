@@ -733,6 +733,19 @@ body.dark-theme .nav-link:hover {
 .cust-balance.plus { color: var(--success); }
 .cust-balance.minus { color: var(--danger); }
 
+.cust-side {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.recent-transactions .btn-delete {
+    border: none;
+    background: transparent;
+    min-width: 40px;
+    min-height: 40px;
+}
+
 /* View Specifics */
 .view-header {
     display: flex;
