@@ -2019,7 +2019,6 @@ function renderForm(type, data = null) {
                         <button type="button" class="gave-got-btn ${role === 'supplier' ? 'active' : ''}" data-party-role="supplier">Supplier</button>
                     </div>
                     <input type="hidden" name="role" id="party-role-input" value="${role}">
-                    <p class="form-hint">Customer = they buy from you. Supplier = you buy from them.</p>
                 </div>
                 <div class="form-group">
                     <label>Name</label>

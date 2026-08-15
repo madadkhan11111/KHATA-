@@ -751,7 +751,7 @@ body.dark-theme .nav-link:hover {
 .modal-card {
     background-color: var(--bg-card);
     width: 100%;
-    max-width: 500px;
+    max-width: 420px;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-lg);
@@ -880,6 +880,23 @@ body.dark-theme .form-group.highlight {
     background: color-mix(in srgb, var(--primary) 16%, var(--bg-card));
     border-color: var(--primary);
     color: var(--primary);
+}
+
+.role-toggle {
+    margin-bottom: 0;
+}
+
+.role-toggle .gave-got-btn {
+    min-height: 38px;
+    font-size: 0.85rem;
+    border-radius: 10px;
+}
+
+.form-hint {
+    margin: 0.4rem 0 0;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.35;
 }
 
 .check-row {
@@ -3076,27 +3093,46 @@ body.rtl .form-row {
     }
 
     .modal-overlay {
-        align-items: flex-end;
-        padding: 0;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
     }
 
     .modal-overlay.active {
         display: flex;
     }
 
+    .modal-overlay:has(.modal-wide) {
+        align-items: flex-end;
+        padding: 0;
+    }
+
     .modal-card {
+        width: 100%;
+        max-width: 420px;
+        max-height: min(88dvh, 720px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 16px;
+        margin: 0 auto;
+        padding-bottom: var(--safe-bottom);
+        animation: rise-in 0.28s ease both;
+    }
+
+    .modal-card.modal-wide {
         width: 100%;
         max-width: none;
         max-height: min(92dvh, 920px);
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
         border-radius: 22px 22px 0 0;
         margin: 0;
-        padding-bottom: var(--safe-bottom);
         animation: sheet-up 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
     }
 
     .modal-card::before {
+        display: none;
+    }
+
+    .modal-card.modal-wide::before {
         content: "";
         display: block;
         width: 40px;
@@ -3131,6 +3167,11 @@ body.rtl .form-row {
 
     .modal-body {
         padding: 1rem 1.15rem 1.25rem;
+    }
+
+    .modal-card:not(.modal-wide) .form-row {
+        flex-direction: row;
+        gap: 0.75rem;
     }
 
     .modal-footer {
