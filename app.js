@@ -914,6 +914,7 @@ async function initApp() {
     setupThemeToggle();
     setupMobileNav();
     setupMobileFab();
+    setupVoiceEntry();
     setupModalHandlers();
     setupFilterHandlers();
     setupPrintPreview();
@@ -1526,6 +1527,10 @@ function setupMobileNav() {
 
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
+            if (document.body.classList.contains('voice-open')) {
+                closeVoiceEntry();
+                return;
+            }
             if (document.body.classList.contains('print-preview-open')) {
                 closePrintPreview();
                 return;
@@ -1841,6 +1846,313 @@ function setupMobileFab() {
     });
 }
 
+let voiceRecognition = null;
+let voiceContext = { customerId: '' };
+
+const VOICE_NUMBER_WORDS = {
+    zero: 0, ek: 1, aik: 1, one: 1, do: 2, two: 2, teen: 3, three: 3,
+    char: 4, four: 4, panch: 5, paanch: 5, five: 5, che: 6, chhe: 6, six: 6,
+    saat: 7, seven: 7, aath: 8, ath: 8, eight: 8, nau: 9, nine: 9,
+    das: 10, ten: 10, gyarah: 11, eleven: 11, barah: 12, twelve: 12,
+    bees: 20, twenty: 20, tees: 30, thirty: 30, chalis: 40, forty: 40,
+    pachas: 50, fifty: 50, saath: 60, sixty: 60, sattar: 70, seventy: 70,
+    assi: 80, eighty: 80, nabbe: 90, ninety: 90,
+    sau: 100, so: 100, hundred: 100, hazar: 1000, thousand: 1000,
+    lakh: 100000, lac: 100000
+};
+
+function getSpeechRecognition() {
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function voiceLang() {
+    return (db.data.settings.language || 'en') === 'ur' ? 'ur-PK' : 'en-IN';
+}
+
+function normalizeVoiceText(text) {
+    return String(text || '')
+        .replace(/[٠-٩]/g, ch => String(ch.charCodeAt(0) - 0x0660))
+        .replace(/[۰-۹]/g, ch => String(ch.charCodeAt(0) - 0x06F0))
+        .replace(/[,،]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function extractVoiceAmount(raw) {
+    const text = normalizeVoiceText(raw).toLowerCase();
+    const scaled = text.match(/(\d+(?:\.\d+)?)\s*(lakh|lac|hazar|thousand|sau|so|hundred)\b/);
+    if (scaled) {
+        const n = parseFloat(scaled[1]);
+        const unit = scaled[2];
+        if (unit === 'lakh' || unit === 'lac') return n * 100000;
+        if (unit === 'hazar' || unit === 'thousand') return n * 1000;
+        return n * 100;
+    }
+    const digits = text.match(/(\d+(?:\.\d+)?)/);
+    if (digits) return parseFloat(digits[1]);
+
+    const tokens = text.split(/[^a-z]+/).filter(Boolean);
+    let total = 0;
+    let current = 0;
+    let found = false;
+    tokens.forEach(word => {
+        const value = VOICE_NUMBER_WORDS[word];
+        if (value == null) return;
+        found = true;
+        if (value === 100000) {
+            total += (current || 1) * value;
+            current = 0;
+        } else if (value === 1000) {
+            total += (current || 1) * value;
+            current = 0;
+        } else if (value === 100) {
+            current = (current || 1) * 100;
+        } else {
+            current += value;
+        }
+    });
+    total += current;
+    return found && total > 0 ? total : 0;
+}
+
+function matchVoiceParty(raw, preferredId) {
+    if (preferredId) {
+        const preferred = db.data.customers.find(c => c.id == preferredId);
+        if (preferred) return preferred;
+    }
+    const text = normalizeVoiceText(raw).toLowerCase();
+    const beforeMarker = text.match(/^(.+?)\s+(?:ko|kay|ke|se|to|from)\b/);
+    const hint = (beforeMarker ? beforeMarker[1] : text)
+        .replace(/\b(diye|dia|diya|liye|lia|liya|banam|jama|income|expense|rupees|rupee|rupay|rs|amount|please|and|the)\b/g, ' ')
+        .replace(/\d+(?:\.\d+)?/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    let best = null;
+    let bestScore = 0;
+    db.data.customers.forEach(customer => {
+        const name = String(customer.name || '').toLowerCase().trim();
+        if (!name) return;
+        const first = name.split(/\s+/)[0];
+        let score = 0;
+        if (text.includes(name) && name.length > 1) score = name.length + 12;
+        else if (hint && name.includes(hint) && hint.length > 1) score = hint.length + 8;
+        else if (hint && hint.includes(name) && name.length > 1) score = name.length + 6;
+        else if (first.length > 2 && text.includes(first)) score = first.length;
+        if (String(customer.khataNo) && text.includes(`khata ${customer.khataNo}`)) score += 10;
+        if (score > bestScore) {
+            best = customer;
+            bestScore = score;
+        }
+    });
+    return bestScore >= 3 ? best : null;
+}
+
+function parseVoiceTranscript(raw, preferredId) {
+    const text = normalizeVoiceText(raw);
+    const lower = text.toLowerCase();
+    const amount = extractVoiceAmount(text);
+    const party = matchVoiceParty(text, preferredId);
+    const gave = /\b(diye|dia|diya|de diye|udhar|udhaar|banam|gave|given|credit)\b|دیے|دیا|بنام/.test(lower);
+    const got = /\b(liye|lia|liya|wasool|wasul|jama|received|got|vasool)\b|لیے|لیا|جمع|وصول/.test(lower);
+    const income = /\b(income|sale|sales|cash in|kamai|collection)\b|آمدنی/.test(lower);
+    const expense = /\b(expense|kharcha|kharch|petrol|cash out)\b|خرچ|خرچہ/.test(lower);
+
+    let kind = 'banam';
+    if (got && !gave) kind = 'jama';
+    else if (gave) kind = 'banam';
+    else if (income && !party) kind = 'income';
+    else if (expense && !party) kind = 'expense';
+    else if (income) kind = 'jama';
+    else if (expense) kind = 'banam';
+    else if (!party) kind = 'income';
+
+    const note = text
+        .replace(/\d+(?:\.\d+)?/g, ' ')
+        .replace(/\b(diye|dia|diya|liye|lia|liya|banam|jama|income|expense|ko|se|kay|ke|rupees|rupee|rupay|rs|hazar|sau|thousand|hundred)\b/gi, ' ')
+        .replace(party ? new RegExp(party.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig') : /$^/, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return { amount, party, kind, note, heard: text };
+}
+
+function fillVoicePartySelect(selectedId) {
+    const select = document.getElementById('voice-party');
+    if (!select) return;
+    const options = ['<option value="">Cash only — no party</option>']
+        .concat(db.data.customers.map(c => (
+            `<option value="${c.id}" ${String(c.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(c.name)} · #${escapeHtml(c.khataNo)}</option>`
+        )));
+    select.innerHTML = options.join('');
+}
+
+function setVoiceType(kind) {
+    document.querySelectorAll('[data-voice-type]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.voiceType === kind);
+    });
+    const wrap = document.getElementById('voice-party-wrap');
+    if (wrap) wrap.hidden = kind === 'income' || kind === 'expense';
+}
+
+function showVoicePreview(parsed) {
+    const preview = document.getElementById('voice-preview');
+    const heard = document.getElementById('voice-heard');
+    const amount = document.getElementById('voice-amount');
+    const note = document.getElementById('voice-note');
+    if (heard) {
+        heard.hidden = !parsed.heard;
+        heard.textContent = parsed.heard ? `Heard: ${parsed.heard}` : '';
+    }
+    fillVoicePartySelect(parsed.party?.id || voiceContext.customerId || '');
+    setVoiceType(parsed.kind || 'banam');
+    if (amount) amount.value = parsed.amount || '';
+    if (note) note.value = parsed.note || '';
+    if (preview) preview.hidden = false;
+}
+
+function setVoiceStatus(message, listening) {
+    const status = document.getElementById('voice-status');
+    const mic = document.getElementById('btn-voice-mic');
+    if (status) status.textContent = message;
+    mic?.classList.toggle('listening', !!listening);
+}
+
+function stopVoiceListen() {
+    try { voiceRecognition?.stop(); } catch (_) { /* ignore */ }
+    voiceRecognition = null;
+    document.getElementById('btn-voice-mic')?.classList.remove('listening');
+}
+
+function startVoiceListen() {
+    const Speech = getSpeechRecognition();
+    if (!Speech) {
+        setVoiceStatus('Voice needs Chrome or Edge on your phone.');
+        showToast('Voice works in Chrome or Edge. Please type the entry.', 'error');
+        return;
+    }
+    stopVoiceListen();
+    const rec = new Speech();
+    rec.lang = voiceLang();
+    rec.interimResults = true;
+    rec.maxAlternatives = 3;
+    rec.continuous = false;
+    setVoiceStatus('Listening… speak now', true);
+    rec.onresult = (event) => {
+        let finalText = '';
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+            const chunk = event.results[i][0]?.transcript || '';
+            if (event.results[i].isFinal) finalText += chunk;
+            else interim += chunk;
+        }
+        const live = (finalText || interim).trim();
+        if (live) setVoiceStatus(live, true);
+        if (finalText.trim()) {
+            const parsed = parseVoiceTranscript(finalText, voiceContext.customerId);
+            showVoicePreview(parsed);
+            setVoiceStatus(parsed.amount ? 'Check and save, or listen again.' : 'I heard you. Please type the amount if it is missing.');
+        }
+    };
+    rec.onerror = (event) => {
+        const err = event.error;
+        if (err === 'not-allowed' || err === 'service-not-allowed') {
+            setVoiceStatus('Microphone permission is blocked. Allow mic for this site.');
+        } else if (err === 'no-speech') {
+            setVoiceStatus('No speech heard. Tap the mic and try again.');
+        } else {
+            setVoiceStatus('Could not hear that. Tap the mic and try again.');
+        }
+    };
+    rec.onend = () => {
+        document.getElementById('btn-voice-mic')?.classList.remove('listening');
+        voiceRecognition = null;
+    };
+    voiceRecognition = rec;
+    try {
+        rec.start();
+    } catch (_) {
+        setVoiceStatus('Mic is busy. Close other apps and try again.');
+    }
+}
+
+function openVoiceEntry(opts = {}) {
+    const overlay = document.getElementById('voice-overlay');
+    if (!overlay) return;
+    closeFabMenu();
+    voiceContext = { customerId: opts.customerId || '' };
+    overlay.hidden = false;
+    document.body.classList.add('voice-open');
+    document.getElementById('voice-preview')?.setAttribute('hidden', '');
+    const heard = document.getElementById('voice-heard');
+    if (heard) {
+        heard.hidden = true;
+        heard.textContent = '';
+    }
+    fillVoicePartySelect(voiceContext.customerId);
+    setVoiceType(voiceContext.customerId ? 'banam' : 'income');
+    setVoiceStatus(getSpeechRecognition()
+        ? 'Tap the mic, then speak.'
+        : 'Voice needs Chrome or Edge on your phone.');
+    startVoiceListen();
+}
+
+function closeVoiceEntry() {
+    stopVoiceListen();
+    const overlay = document.getElementById('voice-overlay');
+    if (overlay) overlay.hidden = true;
+    document.body.classList.remove('voice-open');
+    voiceContext = { customerId: '' };
+}
+
+function saveVoiceEntry() {
+    const kindBtn = document.querySelector('[data-voice-type].active');
+    const kind = kindBtn?.dataset.voiceType || 'banam';
+    const amount = parseFloat(document.getElementById('voice-amount')?.value);
+    const note = (document.getElementById('voice-note')?.value || '').trim();
+    const partyId = document.getElementById('voice-party')?.value || '';
+    if (!amount || amount <= 0) {
+        showToast('Enter a valid amount greater than 0.', 'error');
+        return;
+    }
+    if ((kind === 'banam' || kind === 'jama') && !partyId) {
+        showToast('Pick a party for Banam or Jama.', 'error');
+        return;
+    }
+    const customer = db.data.customers.find(c => c.id == partyId);
+    if (kind === 'banam' || kind === 'jama') {
+        const entryType = kind === 'jama' ? 'debit' : 'credit';
+        db.addKhataEntry(partyId, amount, entryType, note || (kind === 'banam' ? 'Banam' : 'Jama'));
+        showToast(kind === 'banam' ? 'Banam saved from voice.' : 'Jama saved from voice.', 'success');
+        closeVoiceEntry();
+        updateUI();
+        openModal('Account Statement', 'view-ledger');
+        renderLedgerStatement(partyId);
+        return;
+    }
+    const cashType = kind === 'expense' ? 'expense' : 'income';
+    const label = note || (customer ? customer.name : 'Voice entry');
+    db.addRooznamchaEntry(amount, cashType, kind === 'expense' ? 'Expenses' : 'General', label, partyId || null);
+    showToast(kind === 'expense' ? 'Expense saved from voice.' : 'Income saved from voice.', 'success');
+    closeVoiceEntry();
+    updateUI();
+}
+
+function setupVoiceEntry() {
+    document.getElementById('btn-voice-close')?.addEventListener('click', closeVoiceEntry);
+    document.getElementById('btn-voice-mic')?.addEventListener('click', startVoiceListen);
+    document.getElementById('btn-voice-again')?.addEventListener('click', startVoiceListen);
+    document.getElementById('btn-voice-save')?.addEventListener('click', saveVoiceEntry);
+    document.getElementById('voice-overlay')?.addEventListener('click', (e) => {
+        if (e.target.id === 'voice-overlay') closeVoiceEntry();
+    });
+    document.querySelectorAll('[data-voice-type]').forEach(btn => {
+        btn.addEventListener('click', () => setVoiceType(btn.dataset.voiceType));
+    });
+}
+
+window.openVoiceEntry = openVoiceEntry;
+
 /**
  * Theme Toggle
  */
@@ -1942,6 +2254,11 @@ function setupModalHandlers() {
         } else if (target.classList.contains('btn-stock-out')) {
             const item = db.data.stock.find(s => s.id == target.dataset.id);
             if (item) openModal(`Stock Out — ${item.name}`, 'stock-move', { ...item, direction: 'out' });
+        } else if (target.classList.contains('btn-voice-entry') || target.id === 'btn-voice-form') {
+            const form = document.getElementById('main-form');
+            openVoiceEntry({
+                customerId: form?.dataset.customerId || target.dataset.customerId || ''
+            });
         } else if (target.classList.contains('btn-add-income')) {
             openModal('Add Income', 'add-income');
         } else if (target.classList.contains('btn-add-expense')) {
@@ -2201,6 +2518,9 @@ function renderForm(type, data = null) {
             
             return `
                 <div class="form-header-badge ${realType}">${realType.toUpperCase()} ENTRY</div>
+                <button type="button" class="voice-inline-btn" id="btn-voice-form">
+                    <i class="fas fa-microphone"></i> Speak this entry
+                </button>
                 <input type="hidden" name="entryType" value="${realType}">
                 
                 <div class="form-row">
@@ -2248,6 +2568,9 @@ function renderForm(type, data = null) {
                     <button type="button" class="gave-got-btn gave ${kind === 'credit' ? 'active' : ''}" data-khata-type="credit">Banam</button>
                     <button type="button" class="gave-got-btn got ${kind === 'debit' ? 'active' : ''}" data-khata-type="debit">Jama</button>
                 </div>
+                <button type="button" class="voice-inline-btn" id="btn-voice-form">
+                    <i class="fas fa-microphone"></i> Speak amount
+                </button>
                 <input type="hidden" name="type" id="khata-entry-type" value="${kind}">
                 <p class="form-hint" id="khata-entry-hint">${kind === 'credit'
                     ? 'Banam: goods or cash you gave. They will owe you more.'
@@ -2391,6 +2714,7 @@ function renderLedgerStatement(customerId) {
             <div class="ledger-quick no-print">
                 <button type="button" class="ledger-quick-btn gave" onclick="openKhataQuick('${customerId}','credit')">Banam</button>
                 <button type="button" class="ledger-quick-btn got" onclick="openKhataQuick('${customerId}','debit')">Jama</button>
+                <button type="button" class="ledger-quick-btn voice" onclick="openVoiceEntry({customerId:'${customerId}'})">Speak</button>
             </div>
             ${result.tone !== 'clear' ? `
             <button type="button" class="btn btn-secondary ledger-remind no-print" onclick="remindOnWhatsApp('${customerId}')">

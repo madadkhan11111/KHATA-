@@ -6,7 +6,7 @@
     <title>KhataBook Pro - Premium Ledger & Daily Cash Book</title>
     <meta name="description" content="Professional Khata Book and Rooznamcha with free cloud accounts for shops worldwide.">
     <meta name="theme-color" content="#0d7377">
-    <meta name="application-version" content="1.11.0">
+    <meta name="application-version" content="1.12.0">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="KhataPro">
@@ -22,7 +22,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.11.0">
+    <link rel="stylesheet" href="style.css?v=1.12.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -163,6 +163,10 @@
                             <p class="hide-on-mobile">Cash, khata, and daily book — saved for you after every change.</p>
                         </div>
                         <div class="header-actions hide-on-mobile">
+                            <button type="button" class="btn btn-secondary btn-voice-entry">
+                                <i class="fas fa-microphone"></i>
+                                <span>Voice</span>
+                            </button>
                             <button class="btn btn-primary btn-add-transaction">
                                 <i class="fas fa-plus"></i>
                                 <span>New Entry</span>
@@ -287,10 +291,16 @@
                             <h2>Khata</h2>
                             <p class="hide-on-mobile">Tap a name to open the account. Banam = they owe you. Jama = you owe them.</p>
                         </div>
-                        <button type="button" class="btn btn-primary btn-add-customer hide-on-mobile" aria-label="Add party">
-                            <i class="fas fa-user-plus"></i>
-                            <span>Add Party</span>
-                        </button>
+                        <div class="header-actions hide-on-mobile">
+                            <button type="button" class="btn btn-secondary btn-voice-entry">
+                                <i class="fas fa-microphone"></i>
+                                <span>Voice</span>
+                            </button>
+                            <button type="button" class="btn btn-primary btn-add-customer" aria-label="Add party">
+                                <i class="fas fa-user-plus"></i>
+                                <span>Add Party</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="content-card">
@@ -613,6 +623,10 @@
         <div class="fab-backdrop" id="fab-backdrop" hidden></div>
         <div class="mobile-fab-wrap" id="mobile-fab-wrap">
             <div class="fab-actions">
+                <button type="button" class="fab-action btn-voice-entry">
+                    <span>Voice</span>
+                    <span class="fab-action-icon voice"><i class="fas fa-microphone"></i></span>
+                </button>
                 <button type="button" class="fab-action btn-add-income">
                     <span>Income</span>
                     <span class="fab-action-icon income"><i class="fas fa-arrow-down"></i></span>
@@ -694,8 +708,52 @@
         </div>
     </div>
 
-    <script src="site-config.js?v=1.11.0"></script>
-    <script src="cloud-auth.js?v=1.11.0"></script>
-    <script src="app.js?v=1.11.0"></script>
+    <div id="voice-overlay" class="voice-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="voice-title">
+        <div class="voice-sheet">
+            <div class="voice-sheet-top">
+                <h2 id="voice-title">Voice entry</h2>
+                <button type="button" class="btn-close" id="btn-voice-close" aria-label="Close voice entry">&times;</button>
+            </div>
+            <p class="voice-status" id="voice-status">Tap the mic, then speak.</p>
+            <p class="voice-heard" id="voice-heard" hidden></p>
+            <button type="button" class="voice-mic" id="btn-voice-mic" aria-label="Start listening">
+                <i class="fas fa-microphone"></i>
+            </button>
+            <p class="voice-hint" id="voice-hint">Try: Ahmad ko 500 diye · Ali se 1000 liye · Income 2000</p>
+            <div class="voice-preview" id="voice-preview" hidden>
+                <div class="form-group">
+                    <label>Type</label>
+                    <div class="gave-got-toggle voice-type-toggle" role="group" aria-label="Entry type">
+                        <button type="button" class="gave-got-btn gave" data-voice-type="banam">Banam</button>
+                        <button type="button" class="gave-got-btn got" data-voice-type="jama">Jama</button>
+                        <button type="button" class="gave-got-btn" data-voice-type="income">Income</button>
+                        <button type="button" class="gave-got-btn" data-voice-type="expense">Expense</button>
+                    </div>
+                </div>
+                <div class="form-group" id="voice-party-wrap">
+                    <label>Party</label>
+                    <select id="voice-party"></select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label>Amount</label>
+                        <input type="number" id="voice-amount" inputmode="decimal" step="0.01" min="0" placeholder="0">
+                    </div>
+                    <div class="form-group flex-1">
+                        <label>Note</label>
+                        <input type="text" id="voice-note" placeholder="Optional">
+                    </div>
+                </div>
+                <div class="voice-preview-actions">
+                    <button type="button" class="btn btn-secondary" id="btn-voice-again">Listen again</button>
+                    <button type="button" class="btn btn-primary" id="btn-voice-save">Save entry</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="site-config.js?v=1.12.0"></script>
+    <script src="cloud-auth.js?v=1.12.0"></script>
+    <script src="app.js?v=1.12.0"></script>
 </body>
 </html>
