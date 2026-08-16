@@ -916,6 +916,7 @@ async function initApp() {
     setupMobileFab();
     setupModalHandlers();
     setupFilterHandlers();
+    setupPrintPreview();
     setupSearchHandlers();
     setupSettingsHandlers();
     updateProfileDisplay();
@@ -1345,6 +1346,64 @@ function updateReportsPage(preset) {
     }
 }
 
+function printPartyChip(customer) {
+    if (!customer) return '<span class="print-cash-tag">Cash</span>';
+    return `<span class="print-khata-no">#${escapeHtml(customer.khataNo)}</span><span class="print-party-name">${escapeHtml(customer.name)}</span>`;
+}
+
+function printReportRow(transaction) {
+    const customer = transaction.customerId
+        ? db.data.customers.find(c => c.id === transaction.customerId)
+        : null;
+    const remarks = escapeHtml(transaction.description || transaction.category || '');
+    const amountClass = transaction.type === 'expense' ? 'text-danger' : 'text-success';
+    return `
+        <tr>
+            <td class="print-ref">${escapeHtml(transaction.transactionNo || '')}</td>
+            <td>
+                <div class="print-party-line">${customer ? printPartyChip(customer) : '<span class="print-cash-tag">Cash</span>'}</div>
+                ${remarks ? `<div class="print-remarks">${remarks}</div>` : ''}
+            </td>
+            <td class="text-right print-amt ${amountClass}">${Number(transaction.amount || 0).toLocaleString()}</td>
+        </tr>
+    `;
+}
+
+function setupPrintPreview() {
+    document.getElementById('btn-print-preview-close')?.addEventListener('click', closePrintPreview);
+    document.getElementById('btn-print-preview-print')?.addEventListener('click', runPrintFromPreview);
+}
+
+function showPrintPreview(html, title) {
+    const overlay = document.getElementById('print-preview-overlay');
+    const container = document.getElementById('ledger-print-container');
+    const titleEl = document.getElementById('print-preview-title');
+    if (!overlay || !container) return;
+    container.innerHTML = html;
+    if (titleEl) titleEl.textContent = title || 'Print Preview';
+    overlay.hidden = false;
+    document.body.classList.add('print-preview-open');
+    overlay.querySelector('.print-preview-scroll')?.scrollTo({ top: 0 });
+}
+
+function closePrintPreview() {
+    const overlay = document.getElementById('print-preview-overlay');
+    const container = document.getElementById('ledger-print-container');
+    if (overlay) overlay.hidden = true;
+    if (container) container.innerHTML = '';
+    document.body.classList.remove('print-preview-open', 'printing-report');
+}
+
+function runPrintFromPreview() {
+    const container = document.getElementById('ledger-print-container');
+    if (!container?.innerHTML.trim()) return;
+    document.body.classList.add('printing-report');
+    const cleanup = () => document.body.classList.remove('printing-report');
+    window.addEventListener('afterprint', cleanup, { once: true });
+    window.print();
+    setTimeout(cleanup, 2500);
+}
+
 function printFullReport() {
     const { start, end } = getReportDateRange();
     const currency = db.data.settings.currency || 'Rs.';
@@ -1357,76 +1416,53 @@ function printFullReport() {
     const incomeEntries = entries.filter(t => t.type === 'income');
     const expenseEntries = entries.filter(t => t.type === 'expense');
 
-    const rowHtml = (t) => {
-        const customer = t.customerId ? db.data.customers.find(c => c.id === t.customerId) : null;
-        const khataInfo = customer ? `[${customer.khataNo}] ${customer.name}` : 'Cash';
-        return `
-            <tr>
-                <td class="small-text">${t.transactionNo || ''}</td>
-                <td>
-                    <div style="font-weight:700; font-size:0.75rem;">${khataInfo}</div>
-                    <div style="font-size:0.7rem; color:#333;">${t.description || t.category || ''}</div>
-                </td>
-                <td class="text-right">${Number(t.amount).toLocaleString()}</td>
-            </tr>
-        `;
-    };
-
     const html = `
         <div class="print-report strong-report">
             <div class="print-header">
-                <h1>${shopName}</h1>
+                <h1>${escapeHtml(shopName)}</h1>
                 <h2>Business Report</h2>
-                <p>${periodLabel}</p>
+                <p>${escapeHtml(periodLabel)}</p>
             </div>
             <div class="print-summary-strong">
                 <div class="summary-box">
-                    <div class="summary-row"><span>Pending from customers:</span><span class="text-success">${formatMoney(account.totalReceivables, currency)}</span></div>
-                    <div class="summary-row"><span>You have to pay:</span><span class="text-danger">${formatMoney(account.totalPayables, currency)}</span></div>
-                    <div class="summary-row"><span>Cash in Hand:</span><span>${formatMoney(account.cashInHand, currency)}</span></div>
-                    <div class="summary-row"><span>Period Cash In:</span><span class="text-success">${formatMoney(periodStats.income, currency)}</span></div>
-                    <div class="summary-row"><span>Period Cash Out:</span><span class="text-danger">${formatMoney(periodStats.expense, currency)}</span></div>
-                    <div class="summary-row net-row"><span>Period Net:</span><span class="${periodStats.net >= 0 ? 'text-success' : 'text-danger'}">${formatMoney(periodStats.net, currency)}</span></div>
+                    <div class="summary-row"><span>Pending from customers</span><span class="text-success">${formatMoney(account.totalReceivables, currency)}</span></div>
+                    <div class="summary-row"><span>You have to pay</span><span class="text-danger">${formatMoney(account.totalPayables, currency)}</span></div>
+                    <div class="summary-row"><span>Cash in hand</span><span>${formatMoney(account.cashInHand, currency)}</span></div>
+                    <div class="summary-row"><span>Period cash in</span><span class="text-success">${formatMoney(periodStats.income, currency)}</span></div>
+                    <div class="summary-row"><span>Period cash out</span><span class="text-danger">${formatMoney(periodStats.expense, currency)}</span></div>
+                    <div class="summary-row net-row"><span>Period net</span><span class="${periodStats.net >= 0 ? 'text-success' : 'text-danger'}">${formatMoney(periodStats.net, currency)}</span></div>
                 </div>
             </div>
             <div class="print-columns">
                 <div class="print-column">
-                    <div class="column-header income-header">CASH IN (${incomeEntries.length})</div>
+                    <div class="column-header income-header">Cash In <span class="print-count">${incomeEntries.length}</span></div>
                     <table class="print-table compact">
-                        <thead><tr><th>#</th><th>Details</th><th class="text-right">Amount</th></tr></thead>
+                        <thead><tr><th>No</th><th>Details</th><th class="text-right">Amount</th></tr></thead>
                         <tbody>
-                            ${incomeEntries.length ? incomeEntries.map(rowHtml).join('') : '<tr><td colspan="3" class="text-center empty-cell">No income</td></tr>'}
+                            ${incomeEntries.length ? incomeEntries.map(printReportRow).join('') : '<tr><td colspan="3" class="text-center empty-cell">No income</td></tr>'}
                         </tbody>
-                        <tfoot><tr class="total-row"><td colspan="2">TOTAL CASH IN</td><td class="text-right">${periodStats.income.toLocaleString()}</td></tr></tfoot>
+                        <tfoot><tr class="total-row"><td colspan="2">Total cash in</td><td class="text-right">${periodStats.income.toLocaleString()}</td></tr></tfoot>
                     </table>
                 </div>
                 <div class="print-column">
-                    <div class="column-header expense-header">CASH OUT (${expenseEntries.length})</div>
+                    <div class="column-header expense-header">Cash Out <span class="print-count">${expenseEntries.length}</span></div>
                     <table class="print-table compact">
-                        <thead><tr><th>#</th><th>Details</th><th class="text-right">Amount</th></tr></thead>
+                        <thead><tr><th>No</th><th>Details</th><th class="text-right">Amount</th></tr></thead>
                         <tbody>
-                            ${expenseEntries.length ? expenseEntries.map(rowHtml).join('') : '<tr><td colspan="3" class="text-center empty-cell">No expense</td></tr>'}
+                            ${expenseEntries.length ? expenseEntries.map(printReportRow).join('') : '<tr><td colspan="3" class="text-center empty-cell">No expense</td></tr>'}
                         </tbody>
-                        <tfoot><tr class="total-row"><td colspan="2">TOTAL CASH OUT</td><td class="text-right">${periodStats.expense.toLocaleString()}</td></tr></tfoot>
+                        <tfoot><tr class="total-row"><td colspan="2">Total cash out</td><td class="text-right">${periodStats.expense.toLocaleString()}</td></tr></tfoot>
                     </table>
                 </div>
             </div>
             <div class="print-footer-strong">
-                <div class="footer-sign">Signature: _______________________</div>
-                <div class="footer-time">Generated: ${new Date().toLocaleString()}</div>
+                <div class="footer-sign">Signature</div>
+                <div class="footer-time">Printed ${escapeHtml(new Date().toLocaleString())}</div>
             </div>
         </div>
     `;
 
-    const container = document.getElementById('ledger-print-container');
-    if (!container) return;
-    container.innerHTML = html;
-    document.body.classList.add('printing-report');
-    window.print();
-    setTimeout(() => {
-        container.innerHTML = '';
-        document.body.classList.remove('printing-report');
-    }, 1000);
+    showPrintPreview(html, 'Business Report');
 }
 
 function setupFilterHandlers() {
@@ -1490,6 +1526,10 @@ function setupMobileNav() {
 
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
+            if (document.body.classList.contains('print-preview-open')) {
+                closePrintPreview();
+                return;
+            }
             closeSidebar();
             closeFabMenu();
             closeModal();
@@ -1525,129 +1565,85 @@ function printRoozReport(dateFilter) {
     const stats = db.getFilteredStats(dateFilter, dateFilter);
     const currency = db.data.settings.currency || 'Rs.';
     const shopName = db.data.settings.shopName || 'KhataBook Pro';
-    
     const incomeEntries = allTransactions.filter(t => t.type === 'income');
     const expenseEntries = allTransactions.filter(t => t.type === 'expense');
+    const dateLabel = new Date(dateFilter).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 
-    let html = `
+    const html = `
         <div class="print-report strong-report">
             <div class="print-header">
-                <h1>${shopName}</h1>
-                <h2>Daily Cash Book (Rooznamcha)</h2>
-                <p>Date: ${new Date(dateFilter).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                <h1>${escapeHtml(shopName)}</h1>
+                <h2>Daily Cash Book</h2>
+                <p>${escapeHtml(dateLabel)}</p>
             </div>
-            
             <div class="print-columns">
-                <!-- Left Column: INCOME / CASH IN -->
                 <div class="print-column">
-                    <div class="column-header income-header">CASH IN / INCOME (CREDIT)</div>
+                    <div class="column-header income-header">Cash In <span class="print-count">${incomeEntries.length}</span></div>
                     <table class="print-table compact">
                         <thead>
                             <tr>
-                                <th>#</th>
-                                <th>Description</th>
+                                <th>No</th>
+                                <th>Details</th>
                                 <th class="text-right">Amount</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${incomeEntries.length > 0 ? incomeEntries.map(t => {
-                                const customer = t.customerId ? db.data.customers.find(c => c.id === t.customerId) : null;
-                                const khataInfo = customer ? `[${customer.khataNo}] ${customer.name}` : '';
-                                const remarks = t.description || t.category;
-                                return `
-                                    <tr>
-                                        <td class="small-text">${t.transactionNo}</td>
-                                        <td>
-                                            ${khataInfo ? `<div style="font-weight:700; font-size:0.75rem;">${khataInfo}</div>` : ''}
-                                            <div style="font-size:0.7rem; color:#333;">${remarks}</div>
-                                        </td>
-                                        <td class="text-right text-success">${t.amount.toLocaleString()}</td>
-                                    </tr>
-                                `;
-                            }).join('') : '<tr><td colspan="3" class="text-center empty-cell">No Income</td></tr>'}
+                            ${incomeEntries.length ? incomeEntries.map(printReportRow).join('') : '<tr><td colspan="3" class="text-center empty-cell">No income</td></tr>'}
                         </tbody>
                         <tfoot>
                             <tr class="total-row">
-                                <td colspan="2">TOTAL CASH IN</td>
+                                <td colspan="2">Total cash in</td>
                                 <td class="text-right">${stats.income.toLocaleString()}</td>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
-
-                <!-- Right Column: EXPENSE / CASH OUT -->
                 <div class="print-column">
-                    <div class="column-header expense-header">CASH OUT / EXPENSE (DEBIT)</div>
+                    <div class="column-header expense-header">Cash Out <span class="print-count">${expenseEntries.length}</span></div>
                     <table class="print-table compact">
                         <thead>
                             <tr>
-                                <th>#</th>
-                                <th>Description</th>
+                                <th>No</th>
+                                <th>Details</th>
                                 <th class="text-right">Amount</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${expenseEntries.length > 0 ? expenseEntries.map(t => {
-                                const customer = t.customerId ? db.data.customers.find(c => c.id === t.customerId) : null;
-                                const khataInfo = customer ? `[${customer.khataNo}] ${customer.name}` : '';
-                                const remarks = t.description || t.category;
-                                return `
-                                    <tr>
-                                        <td class="small-text">${t.transactionNo}</td>
-                                        <td>
-                                            ${khataInfo ? `<div style="font-weight:700; font-size:0.75rem;">${khataInfo}</div>` : ''}
-                                            <div style="font-size:0.7rem; color:#333;">${remarks}</div>
-                                        </td>
-                                        <td class="text-right text-danger">${t.amount.toLocaleString()}</td>
-                                    </tr>
-                                `;
-                            }).join('') : '<tr><td colspan="3" class="text-center empty-cell">No Expenses</td></tr>'}
+                            ${expenseEntries.length ? expenseEntries.map(printReportRow).join('') : '<tr><td colspan="3" class="text-center empty-cell">No expense</td></tr>'}
                         </tbody>
                         <tfoot>
                             <tr class="total-row">
-                                <td colspan="2">TOTAL CASH OUT</td>
+                                <td colspan="2">Total cash out</td>
                                 <td class="text-right">${stats.expense.toLocaleString()}</td>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
             </div>
-            
             <div class="print-summary-strong">
                 <div class="summary-box">
                     <div class="summary-row">
-                        <span>Total Cash In:</span>
-                        <span class="text-success">${currency} ${stats.income.toLocaleString()}</span>
+                        <span>Total cash in</span>
+                        <span class="text-success">${escapeHtml(currency)} ${stats.income.toLocaleString()}</span>
                     </div>
                     <div class="summary-row">
-                        <span>Total Cash Out:</span>
-                        <span class="text-danger">${currency} ${stats.expense.toLocaleString()}</span>
+                        <span>Total cash out</span>
+                        <span class="text-danger">${escapeHtml(currency)} ${stats.expense.toLocaleString()}</span>
                     </div>
                     <div class="summary-row net-row">
-                        <span>NET CASH BALANCE:</span>
-                        <span class="${stats.net >= 0 ? 'text-success' : 'text-danger'}">${currency} ${stats.net.toLocaleString()}</span>
+                        <span>Net cash</span>
+                        <span class="${stats.net >= 0 ? 'text-success' : 'text-danger'}">${escapeHtml(currency)} ${stats.net.toLocaleString()}</span>
                     </div>
                 </div>
             </div>
-            
             <div class="print-footer-strong">
-                <div class="footer-sign">Signature: _______________________</div>
-                <div class="footer-time">Generated: ${new Date().toLocaleString()}</div>
+                <div class="footer-sign">Signature</div>
+                <div class="footer-time">Printed ${escapeHtml(new Date().toLocaleString())}</div>
             </div>
         </div>
     `;
-    
-    const container = document.getElementById('ledger-print-container');
-    if (container) {
-        container.innerHTML = html;
-        document.body.classList.add('printing-report');
-        window.print();
-        // Clear after print
-        setTimeout(() => { 
-            container.innerHTML = ''; 
-            document.body.classList.remove('printing-report');
-        }, 1000);
-    }
+
+    showPrintPreview(html, 'Daily Cash Book');
 }
 
 function printLedgerStatement(customerId) {
@@ -1679,7 +1675,7 @@ function printLedgerStatement(customerId) {
         `).join('')
         : '<tr><td colspan="5" class="empty-cell">No transactions on this account yet.</td></tr>';
 
-    container.innerHTML = `
+    const html = `
         <div class="print-report ledger-print-report">
             <div class="ledger-print-top">
                 <div>
@@ -1689,7 +1685,7 @@ function printLedgerStatement(customerId) {
                 </div>
                 <div class="ledger-print-issued">
                     <div>Printed: ${escapeHtml(formatDisplayDate(new Date()))}</div>
-                    <div>Khata No. ${escapeHtml(customer.khataNo)}</div>
+                    <div class="print-khata-line">${printPartyChip(customer)}</div>
                 </div>
             </div>
             <div class="ledger-print-party">
@@ -1713,22 +1709,22 @@ function printLedgerStatement(customerId) {
                     <tr>
                         <th>Date</th>
                         <th>Details</th>
-                        <th class="num">Banam (${escapeHtml(currency)})</th>
-                        <th class="num">Jama (${escapeHtml(currency)})</th>
-                        <th class="num">Balance (${escapeHtml(currency)})</th>
+                        <th class="num">Banam</th>
+                        <th class="num">Jama</th>
+                        <th class="num">Balance</th>
                     </tr>
                 </thead>
                 <tbody>${rowHtml}</tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="2">Total</td>
+                        <td colspan="2">Total · ${escapeHtml(currency)}</td>
                         <td class="num">${formatAmount(totalGave)}</td>
                         <td class="num">${formatAmount(totalGot)}</td>
                         <td class="num">${closingAbs}</td>
                     </tr>
                 </tfoot>
             </table>
-            <p class="ledger-print-legend">Banam = you gave (they owe you). Jama = you received (they paid you).</p>
+            <p class="ledger-print-legend">Banam = you gave, they owe you. Jama = you received, they paid you.</p>
             <div class="ledger-print-signs">
                 <div>
                     <div class="sign-line"></div>
@@ -1743,15 +1739,7 @@ function printLedgerStatement(customerId) {
         </div>
     `;
 
-    const cleanup = () => {
-        container.innerHTML = '';
-        document.body.classList.remove('printing-report');
-        window.removeEventListener('afterprint', cleanup);
-    };
-    window.addEventListener('afterprint', cleanup);
-    document.body.classList.add('printing-report');
-    window.print();
-    setTimeout(cleanup, 2500);
+    showPrintPreview(html, 'Account Statement');
 }
 
 window.printLedgerStatement = printLedgerStatement;
@@ -2749,7 +2737,7 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
         return `
             <tr class="entry-row" data-id="${t.id}">
                 <td class="cell-meta">
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">#${t.transactionNo || 'N/A'} (Pg ${t.pageNo || '1'})</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">#${t.transactionNo || 'N/A'} · Pg ${t.pageNo || '1'}</div>
                     ${formatDisplayDate(t.date)}
                 </td>
                 <td class="cell-title">
@@ -2757,8 +2745,8 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
                     ${customer ? `
                         <div style="margin-top: 5px;">
                             <span class="khata-side-badge ${t.type === 'income' ? 'jama' : 'banam'}">${t.type === 'income' ? 'Jama' : 'Banam'}</span>
-                            <span style="background: var(--primary); color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700;">KHATA NO: ${customer.khataNo}</span>
-                            <span style="color: var(--primary); font-size: 0.85rem; margin-left: 5px;">${customer.name}</span>
+                            <span class="print-khata-no">#${escapeHtml(customer.khataNo)}</span>
+                            <span style="color: var(--primary); font-size: 0.85rem; margin-left: 5px;">${escapeHtml(customer.name)}</span>
                         </div>
                     ` : ''}
                 </td>

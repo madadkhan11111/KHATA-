@@ -6,7 +6,7 @@
     <title>KhataBook Pro - Premium Ledger & Daily Cash Book</title>
     <meta name="description" content="Professional Khata Book and Rooznamcha with free cloud accounts for shops worldwide.">
     <meta name="theme-color" content="#0d7377">
-    <meta name="application-version" content="1.10.0">
+    <meta name="application-version" content="1.11.0">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="KhataPro">
@@ -22,7 +22,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.10.0">
+    <link rel="stylesheet" href="style.css?v=1.11.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -674,11 +674,28 @@
         </div>
     </div>
 
-    <!-- Print Containers -->
-    <div id="ledger-print-container"></div>
+    <!-- HD print preview (mobile-first) -->
+    <div id="print-preview-overlay" class="print-preview-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="print-preview-title">
+        <div class="print-preview-toolbar">
+            <button type="button" class="print-preview-close" id="btn-print-preview-close" aria-label="Close preview">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <div class="print-preview-heading">
+                <strong id="print-preview-title">Print Preview</strong>
+                <span>Clear full-HD view</span>
+            </div>
+            <button type="button" class="btn btn-primary print-preview-print" id="btn-print-preview-print">
+                <i class="fas fa-print"></i>
+                <span>Print</span>
+            </button>
+        </div>
+        <div class="print-preview-scroll">
+            <div class="print-preview-paper" id="ledger-print-container"></div>
+        </div>
+    </div>
 
-    <script src="site-config.js?v=1.10.0"></script>
-    <script src="cloud-auth.js?v=1.10.0"></script>
-    <script src="app.js?v=1.10.0"></script>
+    <script src="site-config.js?v=1.11.0"></script>
+    <script src="cloud-auth.js?v=1.11.0"></script>
+    <script src="app.js?v=1.11.0"></script>
 </body>
 </html>
