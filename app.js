@@ -11,14 +11,15 @@ const translations = {
         settings: 'Settings',
         trash: 'Trash',
         cashInHand: 'Cash in Hand',
-        receivables: 'Total Receivables',
-        payables: 'Total Payables',
+        receivables: 'Banam (they owe you)',
+        payables: 'Jama (you owe them)',
         newEntry: 'New Entry',
         addCustomer: 'Add Party',
         addIncome: 'Add Income',
         addExpense: 'Add Expense',
         home: 'Home',
         dailyShort: 'Daily',
+        khataShort: 'Khata',
         menu: 'Menu',
         stock: 'Stock',
         bills: 'Bills'
@@ -30,15 +31,16 @@ const translations = {
         reports: 'Ø±Ù¾ÙˆØ±Ù¹Ø³',
         settings: 'Ø³ÛŒÙ¹Ù†Ú¯Ø²',
         trash: 'Ù¹Ø±ÛŒØ´',
-        cashInHand: 'Ù†Ù‚Ø¯ÛŒ',
-        receivables: 'Ú©Ù„ ÙˆØµÙˆÙ„ÛŒ',
-        payables: 'Ú©Ù„ Ø§Ø¯Ø§Ø¦ÛŒÚ¯ÛŒ',
+        cashInHand: 'نقدی',
+        receivables: 'بنام',
+        payables: 'جمع',
         newEntry: 'Ù†ÛŒØ§ Ø§Ù†Ø¯Ø±Ø§Ø¬',
         addCustomer: 'Ú¯Ø§ÛÚ© Ø´Ø§Ù…Ù„ Ú©Ø±ÛŒÚº',
         addIncome: 'Ø¢Ù…Ø¯Ù†ÛŒ Ø´Ø§Ù…Ù„ Ú©Ø±ÛŒÚº',
         addExpense: 'Ø§Ø®Ø±Ø§Ø¬Ø§Øª Ø´Ø§Ù…Ù„ Ú©Ø±ÛŒÚº',
         home: 'Home',
         dailyShort: 'Daily',
+        khataShort: 'Khata',
         menu: 'Menu',
         stock: 'سٹاک',
         bills: 'بلز'
@@ -813,10 +815,9 @@ class DataManager {
             document.querySelectorAll(`.bottom-nav-item[data-view="${view}"] span`).forEach(el => { el.innerText = text; });
         };
         setBottomText('dashboard', t.home || 'Home');
-        setBottomText('khata', t.khata);
+        setBottomText('khata', t.khataShort || 'Khata');
+        setBottomText('bills', t.bills || 'Bills');
         setBottomText('rooznamcha', t.dailyShort || t.rooznamcha);
-        setBottomText('stock', t.stock || 'Stock');
-        setBottomText('reports', t.reports);
         const menuSpan = document.querySelector('#btn-bottom-menu span');
         if (menuSpan) menuSpan.innerText = t.menu || 'Menu';
 

@@ -3324,6 +3324,11 @@ body.rtl .form-row {
     display: none;
 }
 
+.mobile-cta,
+.mobile-hint {
+    display: none;
+}
+
 .web-mode-banner {
     display: flex;
     align-items: center;
@@ -4786,6 +4791,127 @@ body.rtl .form-row {
     body.rtl .cell-amount {
         text-align: left;
     }
+
+    .top-bar {
+        display: none;
+    }
+
+    .mobile-cta {
+        display: inline-flex;
+        width: auto;
+        min-height: 40px;
+        padding: 0.4rem 0.8rem;
+        font-size: 0.82rem;
+        font-weight: 700;
+        flex: 0 0 auto;
+    }
+
+    .mobile-hint {
+        display: block;
+        margin: -0.35rem 0 0.85rem;
+        font-size: 0.8rem;
+        line-height: 1.4;
+        color: var(--text-muted);
+    }
+
+    .view-header {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.65rem;
+        margin-bottom: 0.65rem;
+    }
+
+    .view-header h2 {
+        font-size: 1.35rem;
+    }
+
+    .day-stat .label {
+        font-size: 0.72rem;
+        line-height: 1.3;
+    }
+
+    .day-stat .value {
+        font-size: 0.95rem;
+    }
+
+    .stat-info .label {
+        font-size: 0.78rem;
+    }
+
+    .stat-hint {
+        font-size: 0.7rem;
+    }
+
+    .bottom-nav-item {
+        font-size: 0.7rem;
+    }
+
+    .bottom-nav-item i {
+        font-size: 1.2rem;
+    }
+
+    .bill-item,
+    .bill-group-head {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "main total"
+            "actions actions";
+    }
+
+    .bill-item-actions {
+        justify-content: flex-start;
+        padding-top: 0.2rem;
+    }
+
+    .bill-item-top {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .bill-item-top strong {
+        white-space: normal;
+        font-size: 0.95rem;
+    }
+
+    .bill-ship-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .bill-mode-btn {
+        min-height: 44px;
+        font-size: 0.8rem;
+        color: var(--text-main);
+    }
+
+    .party-item {
+        padding: 0.85rem 0.9rem;
+    }
+
+    .party-item-name {
+        font-size: 1.05rem;
+    }
+
+    .party-item-balance strong {
+        font-size: 1.08rem;
+    }
+
+    .khata-filters {
+        padding-bottom: 0.15rem;
+    }
+
+    .preset-chip {
+        font-size: 0.8rem;
+    }
+
+    .card-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .rooz-filter-group {
+        width: 100%;
+    }
 }
 
 @keyframes sheet-up {
@@ -4857,13 +4983,18 @@ a.btn-icon {
         gap: 0.5rem;
     }
     .stat-info h3 {
-        font-size: 0.92rem;
+        font-size: 0.95rem;
     }
     .day-stat .value {
-        font-size: 0.74rem;
+        font-size: 0.86rem;
     }
     .bottom-nav-item span {
-        font-size: 0.56rem;
+        font-size: 0.64rem;
+    }
+    .mobile-cta {
+        min-height: 38px;
+        padding: 0.35rem 0.7rem;
+        font-size: 0.78rem;
     }
 }
 
