@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -121,6 +121,14 @@ ipcMain.handle('save-backup', async (event, { folderPath, data }) => {
 });
 
 app.whenReady().then(() => {
+  const sess = session.defaultSession;
+  sess.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(permission === 'media' || permission === 'audioCapture' || permission === 'microphone' || permission === 'notifications');
+  });
+  sess.setPermissionCheckHandler((_webContents, permission) => (
+    permission === 'media' || permission === 'audioCapture' || permission === 'microphone' || permission === 'clipboard-sanitized-write'
+  ));
+
   createWindow();
 
   app.on('activate', () => {

@@ -1848,50 +1848,118 @@ function setupMobileFab() {
 
 let voiceRecognition = null;
 let voiceContext = { customerId: '' };
+let voiceSession = 0;
+let voiceListenTimer = null;
+let voiceFallback = false;
 
 const VOICE_NUMBER_WORDS = {
     zero: 0, ek: 1, aik: 1, one: 1, do: 2, two: 2, teen: 3, three: 3,
-    char: 4, four: 4, panch: 5, paanch: 5, five: 5, che: 6, chhe: 6, six: 6,
+    char: 4, four: 4, chaar: 4, panch: 5, paanch: 5, five: 5, che: 6, chhe: 6, chay: 6, six: 6,
     saat: 7, seven: 7, aath: 8, ath: 8, eight: 8, nau: 9, nine: 9,
     das: 10, ten: 10, gyarah: 11, eleven: 11, barah: 12, twelve: 12,
-    bees: 20, twenty: 20, tees: 30, thirty: 30, chalis: 40, forty: 40,
+    bees: 20, twenty: 20, tees: 30, thirty: 30, chalis: 40, chaalis: 40, forty: 40,
     pachas: 50, fifty: 50, saath: 60, sixty: 60, sattar: 70, seventy: 70,
     assi: 80, eighty: 80, nabbe: 90, ninety: 90,
-    sau: 100, so: 100, hundred: 100, hazar: 1000, thousand: 1000,
+    sau: 100, so: 100, hundred: 100, hazar: 1000, hazaar: 1000, thousand: 1000,
     lakh: 100000, lac: 100000
+};
+
+const URDU_VOICE_SWAP = [
+    [/بنام/g, ' banam '], [/جمع/g, ' jama '],
+    [/دیئے|دیے|دئے|دیا|دیے ہیں|دئے ہیں/g, ' diye '],
+    [/لیئے|لیے|لئے|لیا|لے لیے|لے لیا/g, ' liye '],
+    [/وصول|وسول/g, ' wasool '],
+    [/ادھار|اُدھار/g, ' udhaar '],
+    [/آمدنی|آمدن|کمائی/g, ' income '],
+    [/خرچہ|خرچ/g, ' expense '],
+    [/روپے|روپیہ|رقم/g, ' rupees '],
+    [/لاکھ/g, ' lakh '], [/ہزار/g, ' hazar '], [/(^|\s)سو(\s|$)/g, '$1 sau $2'],
+    [/صفر/g, ' zero '], [/ایک/g, ' ek '], [/دو/g, ' do '], [/تین/g, ' teen '],
+    [/چار/g, ' char '], [/پانچ/g, ' panch '], [/چھ/g, ' che '], [/سات/g, ' saat '],
+    [/آٹھ|اٹھ/g, ' aath '], [/نو/g, ' nau '], [/دس/g, ' das '],
+    [/بیس/g, ' bees '], [/تیس/g, ' tees '], [/چالیس/g, ' chalis '],
+    [/پچاس/g, ' pachas '], [/ساٹھ/g, ' saath '], [/ستر/g, ' sattar '],
+    [/اسی/g, ' assi '], [/نوے|نبے/g, ' nabbe '],
+    [/(^|\s)سے(\s|$)/g, '$1 se $2'], [/(^|\s)کو(\s|$)/g, '$1 ko $2'],
+    [/(^|\s)(کی|کے|کا)(\s|$)/g, '$1 ke $3'],
+];
+
+const URDU_LETTER_MAP = {
+    ا: 'a', آ: 'a', ب: 'b', پ: 'p', ت: 't', ٹ: 't', ث: 's', ج: 'j', چ: 'ch',
+    ح: 'h', خ: 'kh', د: 'd', ڈ: 'd', ذ: 'z', ر: 'r', ڑ: 'r', ز: 'z', ژ: 'zh',
+    س: 's', ش: 'sh', ص: 's', ض: 'z', ط: 't', ظ: 'z', ع: 'a', غ: 'gh', ف: 'f',
+    ق: 'q', ک: 'k', گ: 'g', ل: 'l', م: 'm', ن: 'n', ں: 'n', و: 'o', ہ: 'h',
+    ھ: 'h', ء: '', ی: 'i', ئ: 'i', ے: 'e', ۃ: 'h'
+};
+
+const VOICE_HINTS = {
+    roman: 'Try: Ahmad ko 500 diye · Ali se 1000 liye · Income 2000',
+    en: 'Try: Gave Ahmad 500 · Received 1000 from Ali · Expense 300',
+    ur: 'کوشش کریں: احمد کو 500 دیے · علی سے 1000 لیے · آمدن 2000'
 };
 
 function getSpeechRecognition() {
     return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 }
 
-function voiceLang() {
-    return (db.data.settings.language || 'en') === 'ur' ? 'ur-PK' : 'en-IN';
+function getVoiceMode() {
+    const saved = localStorage.getItem('khata-voice-lang');
+    if (saved === 'roman' || saved === 'en' || saved === 'ur') return saved;
+    return (db.data.settings.language || 'en') === 'ur' ? 'ur' : 'roman';
+}
+
+function setVoiceMode(mode) {
+    const next = mode === 'en' || mode === 'ur' ? mode : 'roman';
+    localStorage.setItem('khata-voice-lang', next);
+    document.querySelectorAll('[data-voice-lang]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.voiceLang === next);
+    });
+    const hint = document.getElementById('voice-hint');
+    if (hint) hint.textContent = VOICE_HINTS[next];
+    return next;
+}
+
+function voiceLangFallbacks(mode = getVoiceMode()) {
+    if (mode === 'ur') return ['ur-PK', 'ur', 'hi-IN', 'en-IN'];
+    if (mode === 'en') return ['en-US', 'en-IN', 'en-GB'];
+    return ['en-IN', 'en-PK', 'ur-PK', 'en-GB', 'en-US'];
+}
+
+function romanizeUrduLetters(text) {
+    return String(text || '').replace(/[\u0600-\u06FF]/g, ch => URDU_LETTER_MAP[ch] ?? '');
+}
+
+function foldVoiceName(text) {
+    return romanizeUrduLetters(text)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '');
 }
 
 function normalizeVoiceText(text) {
-    return String(text || '')
+    let out = String(text || '')
         .replace(/[٠-٩]/g, ch => String(ch.charCodeAt(0) - 0x0660))
         .replace(/[۰-۹]/g, ch => String(ch.charCodeAt(0) - 0x06F0))
-        .replace(/[,،]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
+        .replace(/[,،]/g, ' ');
+    URDU_VOICE_SWAP.forEach(([pattern, value]) => {
+        out = out.replace(pattern, value);
+    });
+    return out.replace(/\s+/g, ' ').trim();
 }
 
 function extractVoiceAmount(raw) {
     const text = normalizeVoiceText(raw).toLowerCase();
-    const scaled = text.match(/(\d+(?:\.\d+)?)\s*(lakh|lac|hazar|thousand|sau|so|hundred)\b/);
+    const scaled = text.match(/(\d+(?:\.\d+)?)\s*(lakh|lac|hazar|hazaar|thousand|sau|so|hundred)\b/);
     if (scaled) {
         const n = parseFloat(scaled[1]);
         const unit = scaled[2];
         if (unit === 'lakh' || unit === 'lac') return n * 100000;
-        if (unit === 'hazar' || unit === 'thousand') return n * 1000;
+        if (unit === 'hazar' || unit === 'hazaar' || unit === 'thousand') return n * 1000;
         return n * 100;
     }
     const digits = text.match(/(\d+(?:\.\d+)?)/);
     if (digits) return parseFloat(digits[1]);
 
-    const tokens = text.split(/[^a-z]+/).filter(Boolean);
+    const tokens = romanizeUrduLetters(text).toLowerCase().split(/[^a-z]+/).filter(Boolean);
     let total = 0;
     let current = 0;
     let found = false;
@@ -1899,10 +1967,7 @@ function extractVoiceAmount(raw) {
         const value = VOICE_NUMBER_WORDS[word];
         if (value == null) return;
         found = true;
-        if (value === 100000) {
-            total += (current || 1) * value;
-            current = 0;
-        } else if (value === 1000) {
+        if (value >= 1000) {
             total += (current || 1) * value;
             current = 0;
         } else if (value === 100) {
@@ -1921,12 +1986,14 @@ function matchVoiceParty(raw, preferredId) {
         if (preferred) return preferred;
     }
     const text = normalizeVoiceText(raw).toLowerCase();
-    const beforeMarker = text.match(/^(.+?)\s+(?:ko|kay|ke|se|to|from)\b/);
+    const foldedText = foldVoiceName(text);
+    const beforeMarker = text.match(/^(.+?)\s+(?:ko|kay|ke|ki|se|say|to|from)\b/i);
     const hint = (beforeMarker ? beforeMarker[1] : text)
-        .replace(/\b(diye|dia|diya|liye|lia|liya|banam|jama|income|expense|rupees|rupee|rupay|rs|amount|please|and|the)\b/g, ' ')
+        .replace(/\b(diye|dia|diya|deya|de|dena|liye|lia|liya|le|lena|banam|banaam|jama|jamaa|income|expense|rupees|rupee|rupay|rs|amount|please|and|the|gave|give|given|got|received|paid|pay|udhar|udhaar|wasool|wasul)\b/gi, ' ')
         .replace(/\d+(?:\.\d+)?/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
+    const foldedHint = foldVoiceName(hint);
 
     let best = null;
     let bestScore = 0;
@@ -1934,12 +2001,20 @@ function matchVoiceParty(raw, preferredId) {
         const name = String(customer.name || '').toLowerCase().trim();
         if (!name) return;
         const first = name.split(/\s+/)[0];
+        const foldedName = foldVoiceName(name);
+        const foldedFirst = foldVoiceName(first);
         let score = 0;
         if (text.includes(name) && name.length > 1) score = name.length + 12;
+        else if (foldedName.length > 2 && foldedText.includes(foldedName)) score = foldedName.length + 10;
         else if (hint && name.includes(hint) && hint.length > 1) score = hint.length + 8;
         else if (hint && hint.includes(name) && name.length > 1) score = name.length + 6;
+        else if (foldedHint.length > 2 && foldedName.includes(foldedHint)) score = foldedHint.length + 7;
+        else if (foldedHint.length > 2 && foldedHint.includes(foldedName)) score = foldedName.length + 5;
         else if (first.length > 2 && text.includes(first)) score = first.length;
-        if (String(customer.khataNo) && text.includes(`khata ${customer.khataNo}`)) score += 10;
+        else if (foldedFirst.length > 2 && foldedText.includes(foldedFirst)) score = foldedFirst.length;
+        if (String(customer.khataNo) && (text.includes(`khata ${customer.khataNo}`) || text.includes(`#${customer.khataNo}`))) {
+            score += 8;
+        }
         if (score > bestScore) {
             best = customer;
             bestScore = score;
@@ -1949,14 +2024,15 @@ function matchVoiceParty(raw, preferredId) {
 }
 
 function parseVoiceTranscript(raw, preferredId) {
+    const heard = String(raw || '').trim();
     const text = normalizeVoiceText(raw);
-    const lower = text.toLowerCase();
+    const lower = `${text} ${romanizeUrduLetters(text)}`.toLowerCase();
     const amount = extractVoiceAmount(text);
     const party = matchVoiceParty(text, preferredId);
-    const gave = /\b(diye|dia|diya|de diye|udhar|udhaar|banam|gave|given|credit)\b|دیے|دیا|بنام/.test(lower);
-    const got = /\b(liye|lia|liya|wasool|wasul|jama|received|got|vasool)\b|لیے|لیا|جمع|وصول/.test(lower);
-    const income = /\b(income|sale|sales|cash in|kamai|collection)\b|آمدنی/.test(lower);
-    const expense = /\b(expense|kharcha|kharch|petrol|cash out)\b|خرچ|خرچہ/.test(lower);
+    const gave = /\b(diye|dia|diya|deya|de diye|de diya|udhar|udhaar|banam|banaam|ba naam|gave|given|give|credit|paid to)\b/.test(lower);
+    const got = /\b(liye|lia|liya|le liye|le lia|wasool|wasul|vasool|jama|jamaa|received|got|collect|collection|debit)\b/.test(lower);
+    const income = /\b(income|sale|sales|cash in|kamai|kamaai|collection)\b/.test(lower);
+    const expense = /\b(expense|kharcha|kharch|petrol|cash out)\b/.test(lower);
 
     let kind = 'banam';
     if (got && !gave) kind = 'jama';
@@ -1969,12 +2045,36 @@ function parseVoiceTranscript(raw, preferredId) {
 
     const note = text
         .replace(/\d+(?:\.\d+)?/g, ' ')
-        .replace(/\b(diye|dia|diya|liye|lia|liya|banam|jama|income|expense|ko|se|kay|ke|rupees|rupee|rupay|rs|hazar|sau|thousand|hundred)\b/gi, ' ')
+        .replace(/\b(diye|dia|diya|deya|liye|lia|liya|banam|banaam|jama|jamaa|income|expense|ko|se|say|kay|ke|ki|rupees|rupee|rupay|rs|hazar|hazaar|sau|so|thousand|hundred|lakh|lac|gave|give|given|got|received|paid|from|to|udhar|udhaar|wasool)\b/gi, ' ')
         .replace(party ? new RegExp(party.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig') : /$^/, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 
-    return { amount, party, kind, note, heard: text };
+    return { amount, party, kind, note, heard: heard || text };
+}
+
+function scoreVoiceParse(parsed) {
+    let score = 0;
+    if (parsed.amount) score += 6;
+    if (parsed.party) score += 5;
+    if (parsed.kind === 'jama' || parsed.kind === 'banam') score += 1;
+    return score;
+}
+
+function bestVoiceParse(transcripts, preferredId) {
+    const unique = [...new Set((transcripts || []).map(t => String(t || '').trim()).filter(Boolean))];
+    if (!unique.length) return parseVoiceTranscript('', preferredId);
+    let best = null;
+    let bestScore = -1;
+    unique.forEach(text => {
+        const parsed = parseVoiceTranscript(text, preferredId);
+        const score = scoreVoiceParse(parsed);
+        if (score > bestScore) {
+            best = parsed;
+            bestScore = score;
+        }
+    });
+    return best;
 }
 
 function fillVoicePartySelect(selectedId) {
@@ -2019,12 +2119,136 @@ function setVoiceStatus(message, listening) {
 }
 
 function stopVoiceListen() {
-    try { voiceRecognition?.stop(); } catch (_) { /* ignore */ }
+    voiceSession += 1;
+    voiceFallback = false;
+    if (voiceListenTimer) {
+        clearTimeout(voiceListenTimer);
+        voiceListenTimer = null;
+    }
+    const rec = voiceRecognition;
     voiceRecognition = null;
+    try { rec?.abort(); } catch (_) {
+        try { rec?.stop(); } catch (__) { /* ignore */ }
+    }
     document.getElementById('btn-voice-mic')?.classList.remove('listening');
 }
 
-function startVoiceListen() {
+async function ensureMicAccess() {
+    if (!navigator.mediaDevices?.getUserMedia) return true;
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function collectVoiceTranscripts(event) {
+    const joined = [];
+    const alts = [];
+    let interim = '';
+    for (let i = 0; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        if (result.isFinal) {
+            joined.push(result[0]?.transcript || '');
+            for (let a = 0; a < result.length; a += 1) {
+                const chunk = result[a]?.transcript || '';
+                if (chunk.trim()) alts.push(chunk.trim());
+            }
+        } else {
+            interim += result[0]?.transcript || '';
+        }
+    }
+    const combined = joined.join(' ').trim();
+    const finals = combined ? [combined, ...alts] : alts;
+    return { finals, interim: interim.trim() };
+}
+
+function finishVoiceListen(rec, session) {
+    if (session !== voiceSession || voiceRecognition !== rec) return;
+    try { rec.stop(); } catch (_) { /* ignore */ }
+}
+
+function startVoiceEngine(Speech, langs, index, session) {
+    if (session !== voiceSession) return;
+    const rec = new Speech();
+    rec.lang = langs[index];
+    rec.interimResults = true;
+    rec.maxAlternatives = 5;
+    rec.continuous = true;
+    voiceFallback = false;
+    voiceRecognition = rec;
+    setVoiceStatus('Listening… speak now', true);
+
+    rec.onresult = (event) => {
+        if (session !== voiceSession) return;
+        const { finals, interim } = collectVoiceTranscripts(event);
+        const live = (finals[0] || interim).trim();
+        if (live) setVoiceStatus(live, true);
+        if (!finals.length) {
+            if (voiceListenTimer) clearTimeout(voiceListenTimer);
+            voiceListenTimer = setTimeout(() => finishVoiceListen(rec, session), 2200);
+            return;
+        }
+        const parsed = bestVoiceParse(finals, voiceContext.customerId);
+        showVoicePreview(parsed);
+        setVoiceStatus(parsed.amount
+            ? 'Check and save, or listen again.'
+            : 'I heard you. Please type the amount if it is missing.');
+        finishVoiceListen(rec, session);
+    };
+
+    rec.onerror = (event) => {
+        if (session !== voiceSession) return;
+        const err = event.error;
+        if (err === 'aborted' || err === 'cancelled') return;
+        const retryNetwork = err === 'network' && !/^en-/i.test(langs[index]);
+        const retryable = err === 'language-not-supported' || retryNetwork;
+        if (retryable && index + 1 < langs.length) {
+            voiceFallback = true;
+            return;
+        }
+        if (err === 'not-allowed' || err === 'service-not-allowed') {
+            setVoiceStatus('Microphone permission is blocked. Allow mic for this site.');
+        } else if (err === 'no-speech') {
+            setVoiceStatus('No speech heard. Tap the mic and try again.');
+        } else if (err === 'network') {
+            setVoiceStatus('Voice needs internet in Chrome or Edge. Try again on the website.');
+        } else {
+            setVoiceStatus('Could not hear that. Tap Roman Urdu, English, or اردو, then try again.');
+        }
+    };
+
+    rec.onend = () => {
+        if (session !== voiceSession) return;
+        if (voiceFallback && index + 1 < langs.length) {
+            voiceFallback = false;
+            startVoiceEngine(Speech, langs, index + 1, session);
+            return;
+        }
+        if (voiceRecognition === rec) voiceRecognition = null;
+        document.getElementById('btn-voice-mic')?.classList.remove('listening');
+        if (voiceListenTimer) {
+            clearTimeout(voiceListenTimer);
+            voiceListenTimer = null;
+        }
+    };
+
+    try {
+        rec.start();
+        if (voiceListenTimer) clearTimeout(voiceListenTimer);
+        voiceListenTimer = setTimeout(() => finishVoiceListen(rec, session), 12000);
+    } catch (_) {
+        if (index + 1 < langs.length) {
+            startVoiceEngine(Speech, langs, index + 1, session);
+            return;
+        }
+        setVoiceStatus('Mic is busy. Close other apps and try again.');
+    }
+}
+
+async function startVoiceListen() {
     const Speech = getSpeechRecognition();
     if (!Speech) {
         setVoiceStatus('Voice needs Chrome or Edge on your phone.');
@@ -2032,48 +2256,16 @@ function startVoiceListen() {
         return;
     }
     stopVoiceListen();
-    const rec = new Speech();
-    rec.lang = voiceLang();
-    rec.interimResults = true;
-    rec.maxAlternatives = 3;
-    rec.continuous = false;
-    setVoiceStatus('Listening… speak now', true);
-    rec.onresult = (event) => {
-        let finalText = '';
-        let interim = '';
-        for (let i = event.resultIndex; i < event.results.length; i += 1) {
-            const chunk = event.results[i][0]?.transcript || '';
-            if (event.results[i].isFinal) finalText += chunk;
-            else interim += chunk;
-        }
-        const live = (finalText || interim).trim();
-        if (live) setVoiceStatus(live, true);
-        if (finalText.trim()) {
-            const parsed = parseVoiceTranscript(finalText, voiceContext.customerId);
-            showVoicePreview(parsed);
-            setVoiceStatus(parsed.amount ? 'Check and save, or listen again.' : 'I heard you. Please type the amount if it is missing.');
-        }
-    };
-    rec.onerror = (event) => {
-        const err = event.error;
-        if (err === 'not-allowed' || err === 'service-not-allowed') {
-            setVoiceStatus('Microphone permission is blocked. Allow mic for this site.');
-        } else if (err === 'no-speech') {
-            setVoiceStatus('No speech heard. Tap the mic and try again.');
-        } else {
-            setVoiceStatus('Could not hear that. Tap the mic and try again.');
-        }
-    };
-    rec.onend = () => {
-        document.getElementById('btn-voice-mic')?.classList.remove('listening');
-        voiceRecognition = null;
-    };
-    voiceRecognition = rec;
-    try {
-        rec.start();
-    } catch (_) {
-        setVoiceStatus('Mic is busy. Close other apps and try again.');
+    const session = voiceSession;
+    setVoiceStatus('Allow microphone, then speak…', true);
+    const allowed = await ensureMicAccess();
+    if (session !== voiceSession) return;
+    if (!allowed) {
+        setVoiceStatus('Microphone permission is blocked. Allow mic for this site.');
+        showToast('Allow microphone to use voice entry.', 'error');
+        return;
     }
+    startVoiceEngine(Speech, voiceLangFallbacks(), 0, session);
 }
 
 function openVoiceEntry(opts = {}) {
@@ -2089,10 +2281,11 @@ function openVoiceEntry(opts = {}) {
         heard.hidden = true;
         heard.textContent = '';
     }
+    setVoiceMode(getVoiceMode());
     fillVoicePartySelect(voiceContext.customerId);
     setVoiceType(voiceContext.customerId ? 'banam' : 'income');
     setVoiceStatus(getSpeechRecognition()
-        ? 'Tap the mic, then speak.'
+        ? 'Tap the mic, then speak in Roman Urdu, English, or Urdu.'
         : 'Voice needs Chrome or Edge on your phone.');
     startVoiceListen();
 }
@@ -2148,6 +2341,12 @@ function setupVoiceEntry() {
     });
     document.querySelectorAll('[data-voice-type]').forEach(btn => {
         btn.addEventListener('click', () => setVoiceType(btn.dataset.voiceType));
+    });
+    document.querySelectorAll('[data-voice-lang]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            setVoiceMode(btn.dataset.voiceLang);
+            startVoiceListen();
+        });
     });
 }
 

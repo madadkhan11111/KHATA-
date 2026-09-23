@@ -4385,7 +4385,34 @@ body.voice-open {
     font-size: 0.95rem;
     font-weight: 600;
     min-height: 1.4em;
-    margin: 0.2rem 0 0.85rem;
+    margin: 0.2rem 0 0.65rem;
+}
+
+.voice-langs {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.4rem;
+    margin: 0 0 0.85rem;
+}
+
+.voice-lang-btn {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--bg-main);
+    color: var(--text-main);
+    border-radius: 999px;
+    min-height: 36px;
+    padding: 0.35rem 0.5rem;
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.voice-lang-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
 }
 
 .voice-heard {
