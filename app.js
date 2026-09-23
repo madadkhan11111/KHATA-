@@ -4084,6 +4084,19 @@ function roozRowMeta(t) {
     return { kind: 'expense', badge: 'banam', badgeText: 'Banam', amountClass: 'text-danger', sign: '-', typeLabel: 'expense' };
 }
 
+function roozListTotals(entries) {
+    let income = 0;
+    let expense = 0;
+    let bills = 0;
+    (entries || []).forEach(t => {
+        const amount = Number(t.amount) || 0;
+        if (t.type === 'income') income += amount;
+        else if (t.type === 'expense') expense += amount;
+        else if (t.type === 'bill' || t.linkedBillId) bills += amount;
+    });
+    return { income, expense, bills, net: income - expense };
+}
+
 function updateRooznamchaLists(dateFilter, searchQuery) {
     const currency = db.data.settings.currency || 'Rs.';
     const recentList = document.getElementById('recent-transactions-list');
@@ -4091,31 +4104,7 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
     
     if (!recentList && !rooznamchaList) return;
 
-    // Daily Summary Stats
     const showingAll = !dateFilter;
-    const periodStats = showingAll
-        ? db.getFilteredStats(null, null)
-        : db.getFilteredStats(dateFilter, dateFilter);
-    const todayIncomeEl = document.getElementById('today-income');
-    const todayExpenseEl = document.getElementById('today-expense');
-    const todayNetEl = document.getElementById('today-net');
-    const incomeLabel = document.getElementById('rooz-income-label');
-    const expenseLabel = document.getElementById('rooz-expense-label');
-    const netLabel = document.getElementById('rooz-net-label');
-    const periodName = showingAll
-        ? 'All'
-        : (dateFilter === localISODate() ? "Today's" : formatDisplayDate(dateFilter));
-    if (incomeLabel) incomeLabel.textContent = `${periodName} Total Income`;
-    if (expenseLabel) expenseLabel.textContent = `${periodName} Total Out`;
-    if (netLabel) netLabel.textContent = `${periodName} Net Balance`;
-
-    if (todayIncomeEl) todayIncomeEl.textContent = `${currency} ${periodStats.income.toLocaleString()}`;
-    if (todayExpenseEl) todayExpenseEl.textContent = `${currency} ${periodStats.expense.toLocaleString()}`;
-    if (todayNetEl) {
-        todayNetEl.textContent = `${currency} ${Math.abs(periodStats.net).toLocaleString()}`;
-        todayNetEl.className = `value ${periodStats.net >= 0 ? 'positive' : 'negative'}`;
-    }
-
     let roozViewTransactions = db.getFilteredRooznamcha(dateFilter);
     let recentTransactions = db.getFilteredRooznamcha(null);
     if (searchQuery) {
@@ -4127,6 +4116,31 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
         };
         roozViewTransactions = roozViewTransactions.filter(applySearch);
         recentTransactions = recentTransactions.filter(applySearch);
+    }
+
+    const periodStats = roozListTotals(roozViewTransactions);
+    const todayIncomeEl = document.getElementById('today-income');
+    const todayExpenseEl = document.getElementById('today-expense');
+    const todayBillsEl = document.getElementById('today-bills');
+    const todayNetEl = document.getElementById('today-net');
+    const incomeLabel = document.getElementById('rooz-income-label');
+    const expenseLabel = document.getElementById('rooz-expense-label');
+    const billsLabel = document.getElementById('rooz-bills-label');
+    const netLabel = document.getElementById('rooz-net-label');
+    const periodName = showingAll
+        ? 'All'
+        : (dateFilter === localISODate() ? "Today's" : formatDisplayDate(dateFilter));
+    if (incomeLabel) incomeLabel.textContent = `${periodName} Income`;
+    if (expenseLabel) expenseLabel.textContent = `${periodName} Out`;
+    if (billsLabel) billsLabel.textContent = `${periodName} Bills Banam`;
+    if (netLabel) netLabel.textContent = `${periodName} Cash Net`;
+
+    if (todayIncomeEl) todayIncomeEl.textContent = `${currency} ${periodStats.income.toLocaleString()}`;
+    if (todayExpenseEl) todayExpenseEl.textContent = `${currency} ${periodStats.expense.toLocaleString()}`;
+    if (todayBillsEl) todayBillsEl.textContent = `${currency} ${periodStats.bills.toLocaleString()}`;
+    if (todayNetEl) {
+        todayNetEl.textContent = `${currency} ${Math.abs(periodStats.net).toLocaleString()}`;
+        todayNetEl.className = `value ${periodStats.net >= 0 ? 'positive' : 'negative'}`;
     }
 
     const renderRoozRow = (t) => {

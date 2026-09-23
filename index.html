@@ -6,7 +6,7 @@
     <title>KhataBook Pro - Premium Ledger & Daily Cash Book</title>
     <meta name="description" content="Professional Khata Book and Rooznamcha with free cloud accounts for shops worldwide.">
     <meta name="theme-color" content="#0d7377">
-    <meta name="application-version" content="1.14.4">
+    <meta name="application-version" content="1.14.5">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="KhataPro">
@@ -22,7 +22,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.14.4">
+    <link rel="stylesheet" href="style.css?v=1.14.5">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -417,15 +417,19 @@
 
                     <div class="daily-summary-bar no-print">
                         <div class="day-stat income">
-                            <span class="label" id="rooz-income-label">Today's Total Income</span>
+                            <span class="label" id="rooz-income-label">Today's Income</span>
                             <span class="value" id="today-income">Rs. 0</span>
                         </div>
                         <div class="day-stat expense">
-                            <span class="label" id="rooz-expense-label">Today's Total Out</span>
+                            <span class="label" id="rooz-expense-label">Today's Out</span>
                             <span class="value" id="today-expense">Rs. 0</span>
                         </div>
+                        <div class="day-stat bills">
+                            <span class="label" id="rooz-bills-label">Today's Bills Banam</span>
+                            <span class="value" id="today-bills">Rs. 0</span>
+                        </div>
                         <div class="day-stat net">
-                            <span class="label" id="rooz-net-label">Today's Net Balance</span>
+                            <span class="label" id="rooz-net-label">Today's Cash Net</span>
                             <span class="value" id="today-net">Rs. 0</span>
                         </div>
                     </div>
@@ -436,7 +440,7 @@
                             <div class="filter-group rooz-filter-group">
                                 <div class="rooz-range" role="group" aria-label="Daily Book range">
                                     <button type="button" class="rooz-range-btn active" data-rooz-range="day">Today</button>
-                                    <button type="button" class="rooz-range-btn" data-rooz-range="all">All</button>
+                                    <button type="button" class="rooz-range-btn" data-rooz-range="all">All Transactions</button>
                                 </div>
                                 <input type="date" id="rooznamcha-date-filter" aria-label="Pick a day">
                                 <button type="button" class="btn-icon phone-only" id="btn-print-rooznamcha-mobile" title="Print daily report" aria-label="Print daily report">
@@ -800,8 +804,8 @@
         </div>
     </div>
 
-    <script src="site-config.js?v=1.14.4"></script>
-    <script src="cloud-auth.js?v=1.14.4"></script>
-    <script src="app.js?v=1.14.4"></script>
+    <script src="site-config.js?v=1.14.5"></script>
+    <script src="cloud-auth.js?v=1.14.5"></script>
+    <script src="app.js?v=1.14.5"></script>
 </body>
 </html>
