@@ -88,6 +88,7 @@ class DataManager {
         if (this.data.settings.openingCash === undefined || this.data.settings.openingCash === null) {
             this.data.settings.openingCash = 0;
         }
+        if (this.ensureBillRooznamcha()) this.save(true);
     }
 
     save(isUndoRedo = false) {
@@ -228,7 +229,15 @@ class DataManager {
         const index = this.data.rooznamcha.findIndex(e => e.id == id);
         if (index === -1) return;
         
-        const entry = this.data.rooznamcha.splice(index, 1)[0];
+        const entry = this.data.rooznamcha[index];
+        if (entry.type === 'bill' || entry.linkedBillId) {
+            const bill = (this.data.bills || []).find(b => b.id == entry.linkedBillId || b.rooznamchaId == entry.id);
+            if (bill) {
+                this.deleteBill(bill.id);
+                return;
+            }
+        }
+        this.data.rooznamcha.splice(index, 1);
         
         // Move to trash
         this.data.trash.push({
@@ -278,9 +287,8 @@ class DataManager {
             this.data.customers.push(trashItem.data);
         } else if (trashItem.type === 'transaction') {
             this.data.rooznamcha.push(trashItem.data);
-            // Re-apply ledger if linked
             const entry = trashItem.data;
-            if (entry.customerId) {
+            if (entry.customerId && entry.type !== 'bill' && !entry.linkedBillId) {
                 const customer = this.data.customers.find(c => c.id == entry.customerId);
                 if (customer) {
                     const khataType = (entry.type === 'income') ? 'debit' : 'credit';
@@ -445,6 +453,7 @@ class DataManager {
             createdAt: nowStamp()
         };
         this.data.bills.push(bill);
+        this.postBillToRooznamcha(bill);
         if (!skipSave) this.save();
         return bill;
     }
@@ -456,6 +465,7 @@ class DataManager {
         const bill = this.data.bills.splice(index, 1)[0];
         this.removeBillFromKhata(bill);
         this.restoreBillStock(bill);
+        this.removeBillFromRooznamcha(bill);
         this.data.trash.push({
             id: Date.now().toString(),
             originalId: bill.id,
@@ -507,6 +517,135 @@ class DataManager {
             stock.qty = next < 0 ? 0 : next;
         });
         this.data.bills.push(bill);
+        this.postBillToRooznamcha(bill);
+    }
+
+    postBillToRooznamcha(bill) {
+        if (!bill) return;
+        if (!Array.isArray(this.data.rooznamcha)) this.data.rooznamcha = [];
+        const customer = this.data.customers.find(c => c.id == bill.customerId);
+        const summary = (bill.items || []).slice(0, 3).map(i => i.name).filter(Boolean).join(', ');
+        const extra = [bill.entryNo && `B/E ${bill.entryNo}`, bill.containerNo && `Cont ${bill.containerNo}`].filter(Boolean).join(' · ');
+        const description = `Bill #${bill.billNo}${customer ? ` — ${customer.name}` : ''}${summary ? ` — ${summary}` : ''}${extra ? ` (${extra})` : ''}`;
+        const existing = this.data.rooznamcha.find(r => r.linkedBillId == bill.id || r.id == bill.rooznamchaId);
+        if (existing) {
+            existing.amount = Number(bill.total) || 0;
+            existing.type = 'bill';
+            existing.category = 'Bill';
+            existing.description = description;
+            existing.date = bill.date;
+            existing.customerId = bill.customerId;
+            existing.linkedBillId = bill.id;
+            bill.rooznamchaId = existing.id;
+            return;
+        }
+        const entry = {
+            id: `${bill.id}-rooz`,
+            transactionNo: this.data.settings.nextTransactionNo++,
+            pageNo: Math.floor(this.data.rooznamcha.length / 20) + 1,
+            amount: Number(bill.total) || 0,
+            type: 'bill',
+            category: 'Bill',
+            description,
+            date: bill.date,
+            customerId: bill.customerId,
+            linkedBillId: bill.id
+        };
+        this.data.rooznamcha.push(entry);
+        bill.rooznamchaId = entry.id;
+    }
+
+    removeBillFromRooznamcha(bill) {
+        if (!bill || !Array.isArray(this.data.rooznamcha)) return;
+        this.data.rooznamcha = this.data.rooznamcha.filter(r => r.linkedBillId != bill.id && r.id != bill.rooznamchaId);
+    }
+
+    ensureBillRooznamcha() {
+        let added = false;
+        (this.data.bills || []).forEach(bill => {
+            const exists = (this.data.rooznamcha || []).some(r => r.linkedBillId == bill.id || r.id == bill.rooznamchaId);
+            if (exists) return;
+            this.postBillToRooznamcha(bill);
+            added = true;
+        });
+        return added;
+    }
+
+    updateBill(id, { customerId, date, items, note, entryNo, containerNo, vehicleNo }) {
+        const bill = (this.data.bills || []).find(b => b.id == id);
+        if (!bill) return null;
+        const customer = this.data.customers.find(c => c.id == customerId);
+        if (!customer) return null;
+
+        const cleanItems = (items || []).map(item => {
+            const name = String(item.name || item.description || '').trim();
+            const unit = normalizeBillUnit(item.unit);
+            const ctns = Number(item.ctns) || 0;
+            const qty = Number(item.qty) || Number(item.weight) || 0;
+            const rate = Number(item.rate ?? item.perKg) || 0;
+            const amount = billLineAmount({ name, unit, ctns, qty, rate, weight: qty });
+            if (!name || amount <= 0) return null;
+            const stock = (this.data.stock || []).find(s => String(s.name).toLowerCase() === name.toLowerCase());
+            return {
+                name,
+                unit,
+                ctns,
+                qty,
+                weight: unit === 'kg' ? qty : 0,
+                rate,
+                perKg: unit === 'kg' ? rate : 0,
+                amount,
+                stockId: stock?.id || '',
+                stockOut: 0
+            };
+        }).filter(Boolean);
+
+        const total = cleanItems.reduce((sum, item) => sum + item.amount, 0);
+        if (total <= 0) return null;
+
+        this.removeBillFromKhata(bill);
+        this.restoreBillStock(bill);
+
+        cleanItems.forEach(item => {
+            if (!item.stockId) return;
+            const stock = this.data.stock.find(s => s.id == item.stockId);
+            if (!stock) return;
+            const take = item.qty || item.weight || item.ctns;
+            const next = (Number(stock.qty) || 0) - take;
+            if (next < 0) return;
+            stock.qty = next;
+            item.stockOut = take;
+        });
+
+        const dateISO = dateToISO(date);
+        const summary = cleanItems.slice(0, 3).map(i => i.name).join(', ');
+        const entryNoText = String(entryNo || '').trim();
+        const containerText = String(containerNo || '').trim();
+        const vehicleText = String(vehicleNo || '').trim();
+        const extra = [entryNoText && `B/E ${entryNoText}`, containerText && `Cont ${containerText}`].filter(Boolean).join(' · ');
+        const khataEntryId = bill.khataEntryId || `${bill.id}-khata`;
+        customer.transactions.push({
+            id: khataEntryId,
+            amount: total,
+            type: 'credit',
+            description: `Bill #${bill.billNo}${summary ? ` — ${summary}` : ''}${extra ? ` (${extra})` : ''}`,
+            date: dateISO,
+            linkedBillId: bill.id
+        });
+        customer.balance += total;
+
+        bill.customerId = customerId;
+        bill.date = dateISO;
+        bill.items = cleanItems;
+        bill.total = total;
+        bill.note = String(note || '').trim();
+        bill.entryNo = entryNoText;
+        bill.containerNo = containerText;
+        bill.vehicleNo = vehicleText;
+        bill.khataEntryId = khataEntryId;
+        this.postBillToRooznamcha(bill);
+        this.save();
+        return bill;
     }
 
     getBillStats() {
@@ -540,7 +679,7 @@ class DataManager {
         this.data.rooznamcha.forEach(entry => {
             const amount = Number(entry.amount) || 0;
             if (entry.type === 'income') cashInHand += amount;
-            else cashInHand -= amount;
+            else if (entry.type === 'expense') cashInHand -= amount;
         });
         return { totalReceivables, totalPayables, cashInHand };
     }
@@ -558,7 +697,7 @@ class DataManager {
             const entryDate = entryLocalDate(entry.date);
             if ((!startDate || entryDate >= startDate) && (!endDate || entryDate <= endDate)) {
                 if (entry.type === 'income') income += Number(entry.amount) || 0;
-                else expense += Number(entry.amount) || 0;
+                else if (entry.type === 'expense') expense += Number(entry.amount) || 0;
             }
         });
         
@@ -1069,6 +1208,7 @@ let cashflowChart = null;
 let distributionChart = null;
 let khataPartyFilter = 'all';
 let stockFilter = 'all';
+let roozRangeMode = 'day';
 
 async function initApp() {
     applySiteConfig();
@@ -1448,6 +1588,7 @@ function updateReportsPage(preset) {
 
     const categories = {};
     entries.forEach(t => {
+        if (t.type !== 'income' && t.type !== 'expense') return;
         const key = t.category || 'General';
         if (!categories[key]) categories[key] = { income: 0, expense: 0 };
         if (t.type === 'income') categories[key].income += t.amount;
@@ -1498,14 +1639,15 @@ function updateReportsPage(preset) {
             : entries.map(t => {
                 const customer = t.customerId ? db.data.customers.find(c => c.id === t.customerId) : null;
                 const when = new Date(t.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+                const meta = roozRowMeta(t);
                 return `
-                    <button type="button" class="report-entry ${t.type}" data-id="${t.id}">
+                    <button type="button" class="report-entry ${meta.kind}" data-id="${t.id}">
                         <div class="report-entry-main">
                             <strong>${t.description || t.category || 'Entry'}</strong>
                             <small>${when}${customer ? ` · ${customer.name}` : ''} · ${t.category || ''}</small>
                         </div>
-                        <span class="${t.type === 'income' ? 'text-success' : 'text-danger'}">
-                            ${t.type === 'income' ? '+' : '-'} ${formatMoney(t.amount, currency)}
+                        <span class="${meta.amountClass}">
+                            ${meta.sign ? `${meta.sign} ` : ''}${formatMoney(t.amount, currency)}
                         </span>
                     </button>
                 `;
@@ -1632,13 +1774,42 @@ function printFullReport() {
     showPrintPreview(html, 'Business Report');
 }
 
+function getRoozViewFilter(passed) {
+    if (roozRangeMode === 'all') return null;
+    if (passed) return passed;
+    return document.getElementById('rooznamcha-date-filter')?.value || localISODate();
+}
+
+function syncRoozRangeButtons() {
+    const dateEl = document.getElementById('rooznamcha-date-filter');
+    const isAll = roozRangeMode === 'all';
+    const isToday = !isAll && dateEl?.value === localISODate();
+    document.querySelector('[data-rooz-range="day"]')?.classList.toggle('active', isToday);
+    document.querySelector('[data-rooz-range="all"]')?.classList.toggle('active', isAll);
+    if (dateEl) dateEl.disabled = isAll;
+}
+
+function setRoozRangeMode(mode) {
+    roozRangeMode = mode === 'all' ? 'all' : 'day';
+    const dateEl = document.getElementById('rooznamcha-date-filter');
+    if (roozRangeMode === 'day' && dateEl) dateEl.value = localISODate();
+    syncRoozRangeButtons();
+    updateUI(getRoozViewFilter());
+}
+
 function setupFilterHandlers() {
     const roozDateFilter = document.getElementById('rooznamcha-date-filter');
     const reportStart = document.getElementById('report-start-date');
     const reportEnd = document.getElementById('report-end-date');
 
     roozDateFilter?.addEventListener('change', () => {
+        roozRangeMode = 'day';
+        syncRoozRangeButtons();
         updateUI(roozDateFilter.value);
+    });
+
+    document.querySelectorAll('[data-rooz-range]').forEach(btn => {
+        btn.addEventListener('click', () => setRoozRangeMode(btn.dataset.roozRange));
     });
 
     const onCustomDates = () => {
@@ -1732,19 +1903,26 @@ function updateProfileDisplay() {
 }
 
 function printRoozReport(dateFilter) {
+    const showingAll = !dateFilter;
     const allTransactions = db.getFilteredRooznamcha(dateFilter);
-    const stats = db.getFilteredStats(dateFilter, dateFilter);
+    const stats = showingAll
+        ? db.getFilteredStats(null, null)
+        : db.getFilteredStats(dateFilter, dateFilter);
     const currency = db.data.settings.currency || 'Rs.';
     const shopName = db.data.settings.shopName || 'KhataBook Pro';
     const incomeEntries = allTransactions.filter(t => t.type === 'income');
     const expenseEntries = allTransactions.filter(t => t.type === 'expense');
-    const dateLabel = new Date(dateFilter).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    const billEntries = allTransactions.filter(t => t.type === 'bill' || t.linkedBillId);
+    const billTotal = billEntries.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+    const dateLabel = showingAll
+        ? 'All transactions'
+        : new Date(dateFilter).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 
     const html = `
         <div class="print-report strong-report">
             <div class="print-header">
                 <h1>${escapeHtml(shopName)}</h1>
-                <h2>Daily Cash Book</h2>
+                <h2>${showingAll ? 'All Transactions' : 'Daily Cash Book'}</h2>
                 <p>${escapeHtml(dateLabel)}</p>
             </div>
             <div class="print-columns">
@@ -1791,6 +1969,30 @@ function printRoozReport(dateFilter) {
                     </table>
                 </div>
             </div>
+            ${billEntries.length ? `
+            <div class="print-columns" style="margin-top:1rem;">
+                <div class="print-column">
+                    <div class="column-header">Bills Banam <span class="print-count">${billEntries.length}</span></div>
+                    <table class="print-table compact">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Details</th>
+                                <th class="text-right">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${billEntries.map(printReportRow).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr class="total-row">
+                                <td colspan="2">Total billed Banam</td>
+                                <td class="text-right">${billTotal.toLocaleString()}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>` : ''}
             <div class="print-summary-strong">
                 <div class="summary-box">
                     <div class="summary-row">
@@ -1805,6 +2007,7 @@ function printRoozReport(dateFilter) {
                         <span>Net cash</span>
                         <span class="${stats.net >= 0 ? 'text-success' : 'text-danger'}">${escapeHtml(currency)} ${stats.net.toLocaleString()}</span>
                     </div>
+                    ${billEntries.length ? `<div class="summary-row"><span>Bills Banam</span><span>${escapeHtml(currency)} ${billTotal.toLocaleString()}</span></div>` : ''}
                 </div>
             </div>
             <div class="print-footer-strong">
@@ -2583,7 +2786,7 @@ function setupModalHandlers() {
         const reportEntry = e.target.closest('.report-entry');
         if (reportEntry?.dataset.id) {
             const entry = db.data.rooznamcha.find(en => en.id == reportEntry.dataset.id);
-            if (entry) openModal(`Edit Transaction #${entry.transactionNo}`, 'edit-entry', entry);
+            openRoozOrBillEditor(entry);
             return;
         }
 
@@ -2604,7 +2807,7 @@ function setupModalHandlers() {
             const entryRow = e.target.closest('tr.entry-row');
             if (entryRow?.dataset.id) {
                 const entry = db.data.rooznamcha.find(en => en.id == entryRow.dataset.id);
-                if (entry) openModal(`Edit Transaction #${entry.transactionNo}`, 'edit-entry', entry);
+                openRoozOrBillEditor(entry);
                 return;
             }
         }
@@ -2622,6 +2825,8 @@ function setupModalHandlers() {
                 return;
             }
             openModal('New Bill', 'create-bill');
+        } else if (target.classList.contains('btn-edit-bill')) {
+            openBillEditor(target.dataset.id);
         } else if (target.classList.contains('btn-print-bill') || target.classList.contains('btn-view-bill')) {
             printBill(target.dataset.id);
         } else if (target.classList.contains('btn-print-container')) {
@@ -2653,6 +2858,10 @@ function setupModalHandlers() {
         } else if (target.classList.contains('btn-edit-entry')) {
             const id = target.dataset.id;
             const entry = db.data.rooznamcha.find(e => e.id == id);
+            if (entry?.linkedBillId || entry?.type === 'bill') {
+                openBillEditor(entry.linkedBillId || id);
+                return;
+            }
             openModal(`Edit Transaction #${entry.transactionNo}`, 'edit-entry', entry);
         } else if (target.classList.contains('btn-add-ledger-entry') || target.classList.contains('btn-view-ledger')) {
             const customerId = target.dataset.id;
@@ -2666,7 +2875,7 @@ function setupModalHandlers() {
             const customerId = target.closest('.btn-whatsapp-direct').dataset.id;
             shareOnWhatsApp(customerId);
         } else if (target.id === 'btn-print-rooznamcha' || target.id === 'btn-print-rooznamcha-mobile') {
-            const dateFilter = document.getElementById('rooznamcha-date-filter')?.value || localISODate();
+            const dateFilter = getRoozViewFilter();
             printRoozReport(dateFilter);
         } else if (target.closest('.btn-print-direct')) {
             const customerId = target.closest('.btn-print-direct').dataset.id;
@@ -2687,9 +2896,14 @@ function setupModalHandlers() {
             updateUI();
         } else if (target.closest('.btn-delete-entry')) {
             const entryId = target.closest('.btn-delete-entry').dataset.id;
-            if (confirm("CAUTION: Are you sure you want to delete this transaction? You will lose this data forever!")) {
+            const entry = db.data.rooznamcha.find(e => e.id == entryId);
+            const isBill = entry?.type === 'bill' || entry?.linkedBillId;
+            const ok = confirm(isBill
+                ? 'Delete this bill from Daily Book? Banam will also be removed from the party khata.'
+                : 'CAUTION: Are you sure you want to delete this transaction? You will lose this data forever!');
+            if (ok) {
                 db.deleteRooznamchaEntry(entryId);
-                showUndoToast('Transaction Deleted');
+                showUndoToast(isBill ? 'Bill deleted' : 'Transaction Deleted');
                 updateUI();
             }
         } else if (target.closest('.btn-delete-customer')) {
@@ -2709,7 +2923,7 @@ function setupModalHandlers() {
             }
         } else if (target.closest('.btn-delete-bill')) {
             const billId = target.closest('.btn-delete-bill').dataset.id;
-            if (confirm('Delete this bill? Banam will be removed from the party khata.')) {
+            if (confirm('Delete this bill? Banam will be removed from khata and Daily Book.')) {
                 db.deleteBill(billId);
                 showUndoToast('Bill deleted');
                 updateUI();
@@ -2988,7 +3202,7 @@ function renderForm(type, data = null) {
         case 'view-ledger':
             return `<div id="ledger-statement-view"></div>`;
         case 'create-bill':
-            return renderCreateBillForm();
+            return renderCreateBillForm(data);
         case 'view-bill':
             return `<div id="bill-view-card"></div>`;
         case 'stock-item': {
@@ -3119,50 +3333,61 @@ function stockOptionsList() {
     return (db.data.stock || []).map(s => `<option value="${escapeHtml(s.name)}"></option>`).join('');
 }
 
-function partyOptionsHtml() {
+function partyOptionsHtml(selected) {
     return [...(db.data.customers || [])]
         .sort((a, b) => String(a.name).localeCompare(String(b.name)))
-        .map(c => `<option value="${c.id}">${escapeHtml(c.name)} · #${escapeHtml(c.khataNo)}</option>`)
+        .map(c => `<option value="${c.id}" ${String(c.id) === String(selected || '') ? 'selected' : ''}>${escapeHtml(c.name)} · #${escapeHtml(c.khataNo)}</option>`)
         .join('');
 }
 
-function billLineHtml() {
+function billLineHtml(item) {
+    const view = item ? billItemView(item) : null;
+    const unit = view?.unit || 'kg';
+    const name = view?.name || '';
+    const ctns = view?.ctns ? String(view.ctns) : '';
+    const qty = view?.qty ? String(view.qty) : '';
+    const rate = view?.rate ? String(view.rate) : '';
     return `
         <div class="bill-line">
-            <input type="text" name="itemName[]" list="bill-stock-list" placeholder="Goods" autocomplete="off">
-            <input type="number" name="itemCtns[]" inputmode="decimal" step="0.01" min="0" placeholder="CTNS">
-            <input type="number" name="itemQty[]" inputmode="decimal" step="0.01" min="0" placeholder="KGS">
-            <select name="itemUnit[]">${billUnitOptions('kg')}</select>
-            <input type="number" name="itemRate[]" inputmode="decimal" step="0.01" min="0" placeholder="Rate">
+            <input type="text" name="itemName[]" list="bill-stock-list" placeholder="Goods" autocomplete="off" value="${escapeHtml(name)}">
+            <input type="number" name="itemCtns[]" inputmode="decimal" step="0.01" min="0" placeholder="CTNS" value="${escapeHtml(ctns)}">
+            <input type="number" name="itemQty[]" inputmode="decimal" step="0.01" min="0" placeholder="${billQtyLabel(unit)}" value="${escapeHtml(qty)}">
+            <select name="itemUnit[]">${billUnitOptions(unit)}</select>
+            <input type="number" name="itemRate[]" inputmode="decimal" step="0.01" min="0" placeholder="Rate" value="${escapeHtml(rate)}">
             <span class="bill-line-amt">0</span>
             <button type="button" class="btn-icon btn-remove-bill-line" aria-label="Remove item">&times;</button>
         </div>
     `;
 }
 
-function billPartyBlockHtml() {
+function billPartyBlockHtml(bill) {
+    const items = bill?.items?.length ? bill.items : [null];
     return `
-        <div class="bill-party-block">
+        <div class="bill-party-block open">
             <div class="bill-party-head">
+                <span class="bill-party-num">1</span>
                 <select name="customerId[]">
                     <option value="">Select party</option>
-                    ${partyOptionsHtml()}
+                    ${partyOptionsHtml(bill?.customerId)}
                 </select>
+                <strong class="bill-party-subtotal">0</strong>
+                <button type="button" class="btn-icon btn-toggle-bill-party" aria-label="Open or close this party"><i class="fas fa-chevron-down"></i></button>
                 <button type="button" class="btn-icon btn-remove-bill-party" aria-label="Remove party" hidden>&times;</button>
             </div>
-            <div class="bill-line-head">
-                <span>Goods</span>
-                <span>CTNS</span>
-                <span>Qty</span>
-                <span>Rate type</span>
-                <span>Rate</span>
-                <span>How much</span>
-                <span></span>
-            </div>
-            <div class="bill-party-lines">${billLineHtml()}</div>
-            <div class="bill-party-foot">
-                <button type="button" class="btn-text btn-add-bill-line">+ Item</button>
-                <strong class="bill-party-subtotal">0</strong>
+            <div class="bill-party-body">
+                <div class="bill-line-head">
+                    <span>Goods</span>
+                    <span>CTNS</span>
+                    <span>Qty</span>
+                    <span>Rate type</span>
+                    <span>Rate</span>
+                    <span>How much</span>
+                    <span></span>
+                </div>
+                <div class="bill-party-lines">${items.map(item => billLineHtml(item)).join('')}</div>
+                <div class="bill-party-foot">
+                    <button type="button" class="btn-text btn-add-bill-line">+ Item</button>
+                </div>
             </div>
         </div>
     `;
@@ -3170,6 +3395,33 @@ function billPartyBlockHtml() {
 
 function billFormMode(form) {
     return form?.dataset.billMode === 'many' ? 'many' : 'one';
+}
+
+function openBillPartyBlock(form, block) {
+    if (!form || !block) return;
+    if (billFormMode(form) === 'many') {
+        form.querySelectorAll('.bill-party-block').forEach(row => {
+            row.classList.toggle('open', row === block);
+        });
+    } else {
+        block.classList.add('open');
+    }
+}
+
+function syncBillPartyBlocks(form) {
+    if (!form) return;
+    const many = billFormMode(form) === 'many';
+    const blocks = [...form.querySelectorAll('.bill-party-block')];
+    blocks.forEach((block, i) => {
+        const num = block.querySelector('.bill-party-num');
+        if (num) num.textContent = String(i + 1);
+        const remove = block.querySelector('.btn-remove-bill-party');
+        if (remove) remove.hidden = !many || blocks.length <= 1;
+        if (!many) block.classList.add('open');
+    });
+    if (many && blocks.length && !blocks.some(b => b.classList.contains('open'))) {
+        blocks[blocks.length - 1].classList.add('open');
+    }
 }
 
 function setBillFormMode(form, mode) {
@@ -3185,57 +3437,60 @@ function setBillFormMode(form, mode) {
     if (!many) {
         [...form.querySelectorAll('.bill-party-block')].slice(1).forEach(block => block.remove());
     }
-    const blocks = form.querySelectorAll('.bill-party-block');
-    form.querySelectorAll('.btn-remove-bill-party').forEach(btn => {
-        btn.hidden = !many || blocks.length <= 1;
-    });
     const hint = form.querySelector('#bill-mode-hint');
     if (hint) {
         hint.textContent = many
-            ? 'Same container / B/E. Each party gets a separate bill and Banam.'
+            ? 'Same container. Only one party stays open — tap a row to edit that party.'
             : 'Qty × Rate. CTNS is cartons only.';
     }
     const save = form.querySelector('#bill-save-btn');
     if (save) save.textContent = many ? 'Save bills as Banam' : 'Save bill as Banam';
+    syncBillPartyBlocks(form);
+    if (many) {
+        const blocks = form.querySelectorAll('.bill-party-block');
+        openBillPartyBlock(form, blocks[blocks.length - 1]);
+    }
     recalcBillForm(form);
 }
 
-function renderCreateBillForm() {
+function renderCreateBillForm(bill = null) {
+    const isEdit = !!(bill && bill.id);
     return `
-        <div class="bill-create">
+        <div class="bill-create${isEdit ? ' is-edit' : ''}">
+            ${isEdit ? '' : `
             <div class="bill-mode-toggle" role="tablist">
                 <button type="button" class="bill-mode-btn active" data-bill-mode="one">1 Party</button>
                 <button type="button" class="bill-mode-btn" data-bill-mode="many">1 Container, many parties</button>
-            </div>
-            <p class="form-hint" id="bill-mode-hint">Qty × Rate. CTNS is cartons only.</p>
+            </div>`}
+            <p class="form-hint" id="bill-mode-hint">${isEdit ? 'Update this bill. Banam and Daily Book will change with it.' : 'Qty × Rate. CTNS is cartons only.'}</p>
             <div class="bill-ship-grid">
                 <label>Date
-                    <input type="date" name="billDate" value="${localISODate()}" required>
+                    <input type="date" name="billDate" value="${escapeHtml(bill?.date ? (entryLocalDate(bill.date) || localISODate()) : localISODate())}" required>
                 </label>
                 <label>B/E No
-                    <input type="text" name="entryNo" placeholder="GD / B/E">
+                    <input type="text" name="entryNo" placeholder="GD / B/E" value="${escapeHtml(bill?.entryNo || '')}">
                 </label>
                 <label>Container
-                    <input type="text" name="containerNo" placeholder="MSKU 1234567">
+                    <input type="text" name="containerNo" placeholder="MSKU 1234567" value="${escapeHtml(bill?.containerNo || '')}">
                 </label>
                 <label>Vehicle
-                    <input type="text" name="vehicleNo" placeholder="Truck no">
+                    <input type="text" name="vehicleNo" placeholder="Truck no" value="${escapeHtml(bill?.vehicleNo || '')}">
                 </label>
             </div>
-            <div id="bill-parties">${billPartyBlockHtml()}</div>
+            <div id="bill-parties">${billPartyBlockHtml(bill)}</div>
             <datalist id="bill-stock-list">${stockOptionsList()}</datalist>
             <button type="button" class="btn btn-secondary" id="btn-add-bill-party" hidden>
                 <i class="fas fa-user-plus"></i> Add party on this container
             </button>
             <label class="bill-note-label">Note
-                <input type="text" name="note" placeholder="Optional remarks">
+                <input type="text" name="note" placeholder="Optional remarks" value="${escapeHtml(bill?.note || '')}">
             </label>
             <div class="modal-footer">
                 <div class="bill-form-total">
                     <span id="bill-form-counts">0 CTNS</span>
                     <strong id="bill-form-total">0</strong>
                 </div>
-                <button type="submit" class="btn btn-primary full-width" id="bill-save-btn">Save bill as Banam</button>
+                <button type="submit" class="btn btn-primary full-width" id="bill-save-btn">${isEdit ? 'Update bill' : 'Save bill as Banam'}</button>
             </div>
         </div>
     `;
@@ -3301,6 +3556,20 @@ function wireBillForm(form) {
         if (e.target.closest('#btn-add-bill-party')) {
             form.querySelector('#bill-parties')?.insertAdjacentHTML('beforeend', billPartyBlockHtml());
             setBillFormMode(form, 'many');
+            const added = form.querySelector('.bill-party-block:last-child');
+            openBillPartyBlock(form, added);
+            added?.querySelector('[name="customerId[]"]')?.focus();
+            return;
+        }
+        const toggleParty = e.target.closest('.btn-toggle-bill-party, .bill-party-num');
+        if (toggleParty) {
+            const block = toggleParty.closest('.bill-party-block');
+            if (!block) return;
+            if (block.classList.contains('open') && billFormMode(form) === 'many') {
+                block.classList.remove('open');
+            } else {
+                openBillPartyBlock(form, block);
+            }
             return;
         }
         const addLine = e.target.closest('.btn-add-bill-line');
@@ -3618,6 +3887,25 @@ function handleFormSubmit(formData) {
             containerNo: formData.get('containerNo'),
             vehicleNo: formData.get('vehicleNo')
         };
+        const editId = form.dataset.editId;
+        if (editId) {
+            const party = parties[0];
+            const bill = db.updateBill(editId, {
+                ...shared,
+                customerId: party.customerId,
+                items: party.items
+            });
+            if (!bill) {
+                showToast('Add goods with qty and rate, then update.', 'error');
+                return false;
+            }
+            const partyName = db.data.customers.find(c => c.id == bill.customerId)?.name || 'khata';
+            showToast(`Bill #${bill.billNo} updated. Banam and Daily Book saved.`, 'success');
+            updateUI();
+            closeModal();
+            switchView('bills');
+            return false;
+        }
         if (billFormMode(form) === 'many' && parties.length > 1 && !String(shared.containerNo || '').trim()) {
             showToast('Enter the container number so these parties stay together.', 'error');
             return false;
@@ -3644,9 +3932,9 @@ function handleFormSubmit(formData) {
         const names = created.map(bill => db.data.customers.find(c => c.id == bill.customerId)?.name).filter(Boolean);
         if (created.length === 1) {
             const party = names[0] || 'khata';
-            showToast(`Bill #${created[0].billNo} saved. Banam posted on ${party}.`, 'success');
+            showToast(`Bill #${created[0].billNo} saved. Banam posted on ${party} and Daily Book.`, 'success');
         } else {
-            showToast(`${created.length} bills saved on this container. Banam posted on each khata.`, 'success');
+            showToast(`${created.length} bills saved. Banam posted on each khata and Daily Book.`, 'success');
         }
         updateUI();
         closeModal();
@@ -3662,10 +3950,12 @@ function handleFormSubmit(formData) {
  * Data Loading & UI Population
  */
 function updateUI(dateFilter = null, searchQuery = "") {
+    if (typeof db !== 'undefined' && db.ensureBillRooznamcha()) db.save(true);
     const roozDateFilter = document.getElementById('rooznamcha-date-filter');
     const todayStr = localISODate();
     if (roozDateFilter && !roozDateFilter.value) roozDateFilter.value = todayStr;
-    const effectiveDateFilter = dateFilter ?? (roozDateFilter?.value || null);
+    const effectiveDateFilter = getRoozViewFilter(dateFilter);
+    syncRoozRangeButtons();
 
     const stats = db.getStats();
     updateStatsDisplay(stats);
@@ -3763,6 +4053,37 @@ function updateStatsDisplay(stats) {
     }
 }
 
+function openBillEditor(billId) {
+    const bills = db.data.bills || [];
+    const bill = bills.find(b => b.id == billId)
+        || bills.find(b => b.rooznamchaId == billId)
+        || bills.find(b => `${b.id}-rooz` == billId);
+    if (!bill) {
+        showToast('Bill not found.', 'error');
+        return;
+    }
+    openModal(`Edit Bill #${bill.billNo}`, 'create-bill', bill);
+}
+
+function openRoozOrBillEditor(entry) {
+    if (!entry) return;
+    if (entry.linkedBillId || entry.type === 'bill') {
+        openBillEditor(entry.linkedBillId || entry.id);
+        return;
+    }
+    openModal(`Edit Transaction #${entry.transactionNo}`, 'edit-entry', entry);
+}
+
+function roozRowMeta(t) {
+    if (t?.type === 'bill' || t?.linkedBillId) {
+        return { kind: 'bill', badge: 'banam', badgeText: 'Banam', amountClass: '', sign: '', typeLabel: 'bill' };
+    }
+    if (t?.type === 'income') {
+        return { kind: 'income', badge: 'jama', badgeText: 'Jama', amountClass: 'text-success', sign: '+', typeLabel: 'income' };
+    }
+    return { kind: 'expense', badge: 'banam', badgeText: 'Banam', amountClass: 'text-danger', sign: '-', typeLabel: 'expense' };
+}
+
 function updateRooznamchaLists(dateFilter, searchQuery) {
     const currency = db.data.settings.currency || 'Rs.';
     const recentList = document.getElementById('recent-transactions-list');
@@ -3771,17 +4092,28 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
     if (!recentList && !rooznamchaList) return;
 
     // Daily Summary Stats
-    const displayDate = dateFilter || localISODate();
-    const todayStats = db.getFilteredStats(displayDate, displayDate);
+    const showingAll = !dateFilter;
+    const periodStats = showingAll
+        ? db.getFilteredStats(null, null)
+        : db.getFilteredStats(dateFilter, dateFilter);
     const todayIncomeEl = document.getElementById('today-income');
     const todayExpenseEl = document.getElementById('today-expense');
     const todayNetEl = document.getElementById('today-net');
+    const incomeLabel = document.getElementById('rooz-income-label');
+    const expenseLabel = document.getElementById('rooz-expense-label');
+    const netLabel = document.getElementById('rooz-net-label');
+    const periodName = showingAll
+        ? 'All'
+        : (dateFilter === localISODate() ? "Today's" : formatDisplayDate(dateFilter));
+    if (incomeLabel) incomeLabel.textContent = `${periodName} Total Income`;
+    if (expenseLabel) expenseLabel.textContent = `${periodName} Total Out`;
+    if (netLabel) netLabel.textContent = `${periodName} Net Balance`;
 
-    if (todayIncomeEl) todayIncomeEl.textContent = `${currency} ${todayStats.income.toLocaleString()}`;
-    if (todayExpenseEl) todayExpenseEl.textContent = `${currency} ${todayStats.expense.toLocaleString()}`;
+    if (todayIncomeEl) todayIncomeEl.textContent = `${currency} ${periodStats.income.toLocaleString()}`;
+    if (todayExpenseEl) todayExpenseEl.textContent = `${currency} ${periodStats.expense.toLocaleString()}`;
     if (todayNetEl) {
-        todayNetEl.textContent = `${currency} ${Math.abs(todayStats.net).toLocaleString()}`;
-        todayNetEl.className = `value ${todayStats.net >= 0 ? 'positive' : 'negative'}`;
+        todayNetEl.textContent = `${currency} ${Math.abs(periodStats.net).toLocaleString()}`;
+        todayNetEl.className = `value ${periodStats.net >= 0 ? 'positive' : 'negative'}`;
     }
 
     let roozViewTransactions = db.getFilteredRooznamcha(dateFilter);
@@ -3799,6 +4131,7 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
 
     const renderRoozRow = (t) => {
         const customer = t.customerId ? db.data.customers.find(c => c.id === t.customerId) : null;
+        const meta = roozRowMeta(t);
         return `
             <tr class="entry-row" data-id="${t.id}">
                 <td class="cell-meta">
@@ -3809,17 +4142,17 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
                     <div>${t.description || 'No description'}</div>
                     ${customer ? `
                         <div style="margin-top: 5px;">
-                            <span class="khata-side-badge ${t.type === 'income' ? 'jama' : 'banam'}">${t.type === 'income' ? 'Jama' : 'Banam'}</span>
+                            <span class="khata-side-badge ${meta.badge}">${meta.badgeText}</span>
                             <span class="print-khata-no">#${escapeHtml(customer.khataNo)}</span>
                             <span style="color: var(--primary); font-size: 0.85rem; margin-left: 5px;">${escapeHtml(customer.name)}</span>
                         </div>
-                    ` : ''}
+                    ` : meta.kind === 'bill' ? `<div style="margin-top: 5px;"><span class="khata-side-badge banam">Banam</span></div>` : ''}
                 </td>
-                <td class="cell-sub"><span class="badge ${t.type}">${t.category}</span></td>
-                <td class="cell-amount ${t.type === 'income' ? 'text-success' : 'text-danger'}">
-                    ${t.type === 'income' ? '+' : '-'} ${currency} ${t.amount.toLocaleString()}
+                <td class="cell-sub"><span class="badge ${meta.kind}">${t.category}</span></td>
+                <td class="cell-amount ${meta.amountClass}">
+                    ${meta.sign ? `${meta.sign} ` : ''}${currency} ${t.amount.toLocaleString()}
                 </td>
-                <td class="cell-muted">${t.type}</td>
+                <td class="cell-muted">${meta.typeLabel}</td>
                 <td class="cell-actions no-print">
                     <div class="table-actions">
                         <button class="btn-icon btn-edit-entry" data-id="${t.id}" title="Edit Transaction">
@@ -3836,16 +4169,17 @@ function updateRooznamchaLists(dateFilter, searchQuery) {
 
     const renderRecentRow = (t) => {
         const customer = t.customerId ? db.data.customers.find(c => c.id === t.customerId) : null;
+        const meta = roozRowMeta(t);
         return `
             <tr class="entry-row" data-id="${t.id}">
                 <td class="cell-meta">${formatDisplayDate(t.date)}</td>
                 <td class="cell-title">
                     <div>${t.description || 'No description'}</div>
-                    ${customer ? `<div style="margin-top: 5px; color: var(--primary); font-size: 0.85rem;"><span class="khata-side-badge ${t.type === 'income' ? 'jama' : 'banam'}">${t.type === 'income' ? 'Jama' : 'Banam'}</span> ${customer.name}</div>` : ''}
+                    ${customer ? `<div style="margin-top: 5px; color: var(--primary); font-size: 0.85rem;"><span class="khata-side-badge ${meta.badge}">${meta.badgeText}</span> ${customer.name}</div>` : ''}
                 </td>
-                <td class="cell-sub"><span class="badge ${t.type}">${t.category}</span></td>
-                <td class="cell-amount ${t.type === 'income' ? 'text-success' : 'text-danger'}">
-                    ${t.type === 'income' ? '+' : '-'} ${currency} ${t.amount.toLocaleString()}
+                <td class="cell-sub"><span class="badge ${meta.kind}">${t.category}</span></td>
+                <td class="cell-amount ${meta.amountClass}">
+                    ${meta.sign ? `${meta.sign} ` : ''}${currency} ${t.amount.toLocaleString()}
                 </td>
                 <td class="cell-actions no-print">
                     <button type="button" class="btn-delete btn-delete-entry" data-id="${t.id}" title="Delete" aria-label="Delete entry">
@@ -4032,6 +4366,7 @@ function billListRowHtml(bill, currency, { compact } = {}) {
                 <strong>${escapeHtml(currency)} ${formatAmount(bill.total)}</strong>
             </div>
             <div class="bill-item-actions">
+                <button type="button" class="btn-icon btn-edit-bill" data-id="${bill.id}" title="Edit bill" aria-label="Edit bill"><i class="fas fa-pen"></i></button>
                 <button type="button" class="btn-icon btn-view-bill" data-id="${bill.id}" title="View / Print" aria-label="View bill"><i class="fas fa-print"></i></button>
                 <button type="button" class="btn-delete btn-delete-bill" data-id="${bill.id}" title="Delete bill" aria-label="Delete bill"><i class="fas fa-trash-alt"></i></button>
             </div>
