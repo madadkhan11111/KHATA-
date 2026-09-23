@@ -47,6 +47,7 @@ html {
 }
 
 body.dark-theme {
+    color-scheme: dark;
     --bg-main: #081413;
     --bg-card: #122422;
     --bg-sidebar: #061110;
@@ -1066,15 +1067,24 @@ body.dark-theme .form-group.highlight {
     min-width: 0;
 }
 
-.party-toolbar #customer-search,
-.party-toolbar #stock-search {
-    width: min(260px, 100%);
+.party-toolbar input,
+.party-toolbar input[type="search"] {
+    width: min(420px, 100%);
     height: 42px;
     padding: 0 0.9rem;
     border: 1px solid var(--border);
     border-radius: 999px;
     background: var(--bg-main);
     color: var(--text-main);
+    outline: none;
+}
+
+.party-toolbar input::placeholder {
+    color: var(--text-muted);
+}
+
+.party-toolbar input:focus {
+    border-color: var(--primary);
 }
 
 .party-list {
@@ -4043,10 +4053,15 @@ body.rtl .form-row {
         align-items: stretch;
     }
 
-    .party-toolbar #customer-search {
+    .party-toolbar input,
+    .party-toolbar #customer-search,
+    .party-toolbar #stock-search,
+    .party-toolbar #bills-search {
         width: 100%;
         min-height: 46px;
         border-radius: 999px;
+        background: var(--bg-main);
+        color: var(--text-main);
     }
 
     .view-header {
