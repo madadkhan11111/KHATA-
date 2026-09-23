@@ -367,7 +367,7 @@ class DataManager {
         this.save();
     }
 
-    addBill({ customerId, date, items, note, entryNo, containerNo, vehicleNo }) {
+    addBill({ customerId, date, items, note, entryNo, containerNo, vehicleNo, containerGroupId, skipSave }) {
         if (!Array.isArray(this.data.bills)) this.data.bills = [];
         if (!this.data.settings.nextBillNo) this.data.settings.nextBillNo = 1;
         const customer = this.data.customers.find(c => c.id == customerId);
@@ -441,10 +441,11 @@ class DataManager {
             containerNo: containerText,
             vehicleNo: vehicleText,
             khataEntryId,
+            containerGroupId: String(containerGroupId || '').trim(),
             createdAt: nowStamp()
         };
         this.data.bills.push(bill);
-        this.save();
+        if (!skipSave) this.save();
         return bill;
     }
 
@@ -2623,6 +2624,8 @@ function setupModalHandlers() {
             openModal('New Bill', 'create-bill');
         } else if (target.classList.contains('btn-print-bill') || target.classList.contains('btn-view-bill')) {
             printBill(target.dataset.id);
+        } else if (target.classList.contains('btn-print-container')) {
+            printBills(String(target.dataset.ids || '').split(',').filter(Boolean), 'Container bills');
         } else if (target.classList.contains('btn-edit-stock')) {
             const item = db.data.stock.find(s => s.id == target.dataset.id);
             if (item) openModal('Edit Item', 'stock-item', item);
@@ -3116,10 +3119,17 @@ function stockOptionsList() {
     return (db.data.stock || []).map(s => `<option value="${escapeHtml(s.name)}"></option>`).join('');
 }
 
+function partyOptionsHtml() {
+    return [...(db.data.customers || [])]
+        .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+        .map(c => `<option value="${c.id}">${escapeHtml(c.name)} · #${escapeHtml(c.khataNo)}</option>`)
+        .join('');
+}
+
 function billLineHtml() {
     return `
         <div class="bill-line">
-            <input type="text" name="itemName[]" list="bill-stock-list" placeholder="Description of goods" autocomplete="off">
+            <input type="text" name="itemName[]" list="bill-stock-list" placeholder="Goods" autocomplete="off">
             <input type="number" name="itemCtns[]" inputmode="decimal" step="0.01" min="0" placeholder="CTNS">
             <input type="number" name="itemQty[]" inputmode="decimal" step="0.01" min="0" placeholder="KGS">
             <select name="itemUnit[]">${billUnitOptions('kg')}</select>
@@ -3130,44 +3140,18 @@ function billLineHtml() {
     `;
 }
 
-function renderCreateBillForm() {
-    const parties = [...(db.data.customers || [])]
-        .sort((a, b) => String(a.name).localeCompare(String(b.name)))
-        .map(c => `<option value="${c.id}">${escapeHtml(c.name)} · #${escapeHtml(c.khataNo)}</option>`)
-        .join('');
+function billPartyBlockHtml() {
     return `
-        <p class="form-hint">How much = Qty × Rate. Choose Per KGS, Per Pair, Per PCS, or Per CBM for each item. CTNS is cartons only.</p>
-        <div class="form-row">
-            <div class="form-group flex-1">
-                <label>Party</label>
-                <select name="customerId" required>
+        <div class="bill-party-block">
+            <div class="bill-party-head">
+                <select name="customerId[]">
                     <option value="">Select party</option>
-                    ${parties}
+                    ${partyOptionsHtml()}
                 </select>
+                <button type="button" class="btn-icon btn-remove-bill-party" aria-label="Remove party" hidden>&times;</button>
             </div>
-            <div class="form-group flex-1">
-                <label>Date</label>
-                <input type="date" name="billDate" value="${localISODate()}" required>
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group flex-1">
-                <label>Bill of Entry No</label>
-                <input type="text" name="entryNo" placeholder="B/E or GD number">
-            </div>
-            <div class="form-group flex-1">
-                <label>Container No</label>
-                <input type="text" name="containerNo" placeholder="e.g. MSKU 1234567">
-            </div>
-        </div>
-        <div class="form-group">
-            <label>Vehicle / Truck No (optional)</label>
-            <input type="text" name="vehicleNo" placeholder="Delivery vehicle number">
-        </div>
-        <div class="form-group">
-            <label>Goods</label>
             <div class="bill-line-head">
-                <span>Description of goods</span>
+                <span>Goods</span>
                 <span>CTNS</span>
                 <span>Qty</span>
                 <span>Rate type</span>
@@ -3175,22 +3159,84 @@ function renderCreateBillForm() {
                 <span>How much</span>
                 <span></span>
             </div>
-            <div id="bill-lines">${billLineHtml()}${billLineHtml()}</div>
+            <div class="bill-party-lines">${billLineHtml()}</div>
+            <div class="bill-party-foot">
+                <button type="button" class="btn-text btn-add-bill-line">+ Item</button>
+                <strong class="bill-party-subtotal">0</strong>
+            </div>
+        </div>
+    `;
+}
+
+function billFormMode(form) {
+    return form?.dataset.billMode === 'many' ? 'many' : 'one';
+}
+
+function setBillFormMode(form, mode) {
+    if (!form) return;
+    const next = mode === 'many' ? 'many' : 'one';
+    form.dataset.billMode = next;
+    form.querySelectorAll('.bill-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.billMode === next);
+    });
+    const many = next === 'many';
+    const addParty = form.querySelector('#btn-add-bill-party');
+    if (addParty) addParty.hidden = !many;
+    if (!many) {
+        [...form.querySelectorAll('.bill-party-block')].slice(1).forEach(block => block.remove());
+    }
+    const blocks = form.querySelectorAll('.bill-party-block');
+    form.querySelectorAll('.btn-remove-bill-party').forEach(btn => {
+        btn.hidden = !many || blocks.length <= 1;
+    });
+    const hint = form.querySelector('#bill-mode-hint');
+    if (hint) {
+        hint.textContent = many
+            ? 'Same container / B/E. Each party gets a separate bill and Banam.'
+            : 'Qty × Rate. CTNS is cartons only.';
+    }
+    const save = form.querySelector('#bill-save-btn');
+    if (save) save.textContent = many ? 'Save bills as Banam' : 'Save bill as Banam';
+    recalcBillForm(form);
+}
+
+function renderCreateBillForm() {
+    return `
+        <div class="bill-create">
+            <div class="bill-mode-toggle" role="tablist">
+                <button type="button" class="bill-mode-btn active" data-bill-mode="one">1 Party</button>
+                <button type="button" class="bill-mode-btn" data-bill-mode="many">1 Container, many parties</button>
+            </div>
+            <p class="form-hint" id="bill-mode-hint">Qty × Rate. CTNS is cartons only.</p>
+            <div class="bill-ship-grid">
+                <label>Date
+                    <input type="date" name="billDate" value="${localISODate()}" required>
+                </label>
+                <label>B/E No
+                    <input type="text" name="entryNo" placeholder="GD / B/E">
+                </label>
+                <label>Container
+                    <input type="text" name="containerNo" placeholder="MSKU 1234567">
+                </label>
+                <label>Vehicle
+                    <input type="text" name="vehicleNo" placeholder="Truck no">
+                </label>
+            </div>
+            <div id="bill-parties">${billPartyBlockHtml()}</div>
             <datalist id="bill-stock-list">${stockOptionsList()}</datalist>
-            <button type="button" class="btn btn-secondary" id="btn-add-bill-line" style="margin-top:0.55rem;">
-                <i class="fas fa-plus"></i> Add item
+            <button type="button" class="btn btn-secondary" id="btn-add-bill-party" hidden>
+                <i class="fas fa-user-plus"></i> Add party on this container
             </button>
-        </div>
-        <div class="bill-form-total">
-            <span id="bill-form-counts">0 CTNS</span>
-            <strong id="bill-form-total">0</strong>
-        </div>
-        <div class="form-group">
-            <label>Note (optional)</label>
-            <input type="text" name="note" placeholder="Remarks, origin, or packing">
-        </div>
-        <div class="modal-footer">
-            <button type="submit" class="btn btn-primary full-width">Save bill as Banam</button>
+            <label class="bill-note-label">Note
+                <input type="text" name="note" placeholder="Optional remarks">
+            </label>
+            <div class="modal-footer">
+                <div class="bill-form-total">
+                    <span id="bill-form-counts">0 CTNS</span>
+                    <strong id="bill-form-total">0</strong>
+                </div>
+                <button type="submit" class="btn btn-primary full-width" id="bill-save-btn">Save bill as Banam</button>
+            </div>
         </div>
     `;
 }
@@ -3201,48 +3247,82 @@ function recalcBillForm(form) {
     let total = 0;
     let ctns = 0;
     const qtyByUnit = { kg: 0, pair: 0, pcs: 0, cbm: 0 };
-    form.querySelectorAll('.bill-line').forEach(row => {
-        const item = {
-            ctns: row.querySelector('[name="itemCtns[]"]')?.value,
-            qty: row.querySelector('[name="itemQty[]"]')?.value,
-            unit: row.querySelector('[name="itemUnit[]"]')?.value,
-            rate: row.querySelector('[name="itemRate[]"]')?.value
-        };
-        const unit = normalizeBillUnit(item.unit);
-        const amount = billLineAmount(item);
-        total += amount;
-        ctns += Number(item.ctns) || 0;
-        qtyByUnit[unit] += Number(item.qty) || 0;
-        const amt = row.querySelector('.bill-line-amt');
-        if (amt) amt.textContent = amount ? formatAmount(amount) : '0';
-        const qtyInput = row.querySelector('[name="itemQty[]"]');
-        if (qtyInput) qtyInput.placeholder = billQtyLabel(unit);
+    form.querySelectorAll('.bill-party-block').forEach(block => {
+        let sub = 0;
+        block.querySelectorAll('.bill-line').forEach(row => {
+            const item = {
+                ctns: row.querySelector('[name="itemCtns[]"]')?.value,
+                qty: row.querySelector('[name="itemQty[]"]')?.value,
+                unit: row.querySelector('[name="itemUnit[]"]')?.value,
+                rate: row.querySelector('[name="itemRate[]"]')?.value
+            };
+            const unit = normalizeBillUnit(item.unit);
+            const amount = billLineAmount(item);
+            sub += amount;
+            total += amount;
+            ctns += Number(item.ctns) || 0;
+            qtyByUnit[unit] += Number(item.qty) || 0;
+            const amt = row.querySelector('.bill-line-amt');
+            if (amt) amt.textContent = amount ? formatAmount(amount) : '0';
+            const qtyInput = row.querySelector('[name="itemQty[]"]');
+            if (qtyInput) qtyInput.placeholder = billQtyLabel(unit);
+        });
+        const subEl = block.querySelector('.bill-party-subtotal');
+        if (subEl) subEl.textContent = sub ? formatMoney(sub, currency) : formatMoney(0, currency);
     });
     const totalEl = form.querySelector('#bill-form-total');
     const countsEl = form.querySelector('#bill-form-counts');
     if (totalEl) totalEl.textContent = formatMoney(total, currency);
-    const parts = [`${formatAmount(ctns)} CTNS`];
+    const parts = [];
+    if (billFormMode(form) === 'many') parts.push(`${form.querySelectorAll('.bill-party-block').length} parties`);
+    parts.push(`${formatAmount(ctns)} CTNS`);
     if (qtyByUnit.kg) parts.push(`${formatAmount(qtyByUnit.kg)} KGS`);
     if (qtyByUnit.pair) parts.push(`${formatAmount(qtyByUnit.pair)} Pair`);
     if (qtyByUnit.pcs) parts.push(`${formatAmount(qtyByUnit.pcs)} PCS`);
     if (qtyByUnit.cbm) parts.push(`${formatAmount(qtyByUnit.cbm)} CBM`);
     if (countsEl) countsEl.textContent = parts.join(' · ');
+    const save = form.querySelector('#bill-save-btn');
+    if (save && billFormMode(form) === 'many') {
+        const n = form.querySelectorAll('.bill-party-block').length;
+        save.textContent = n > 1 ? `Save ${n} bills as Banam` : 'Save bills as Banam';
+    }
 }
 
 function wireBillForm(form) {
     if (!form) return;
-    const lines = form.querySelector('#bill-lines');
+    form.dataset.billMode = 'one';
     recalcBillForm(form);
-    form.querySelector('#btn-add-bill-line')?.addEventListener('click', () => {
-        lines?.insertAdjacentHTML('beforeend', billLineHtml());
-        recalcBillForm(form);
-    });
     form.addEventListener('click', (e) => {
-        const remove = e.target.closest('.btn-remove-bill-line');
-        if (!remove) return;
-        const rows = form.querySelectorAll('.bill-line');
+        const modeBtn = e.target.closest('.bill-mode-btn');
+        if (modeBtn) {
+            setBillFormMode(form, modeBtn.dataset.billMode);
+            return;
+        }
+        if (e.target.closest('#btn-add-bill-party')) {
+            form.querySelector('#bill-parties')?.insertAdjacentHTML('beforeend', billPartyBlockHtml());
+            setBillFormMode(form, 'many');
+            return;
+        }
+        const addLine = e.target.closest('.btn-add-bill-line');
+        if (addLine) {
+            addLine.closest('.bill-party-block')?.querySelector('.bill-party-lines')?.insertAdjacentHTML('beforeend', billLineHtml());
+            recalcBillForm(form);
+            return;
+        }
+        const removeParty = e.target.closest('.btn-remove-bill-party');
+        if (removeParty) {
+            const blocks = form.querySelectorAll('.bill-party-block');
+            if (blocks.length <= 1) return;
+            removeParty.closest('.bill-party-block')?.remove();
+            setBillFormMode(form, billFormMode(form));
+            return;
+        }
+        const removeLine = e.target.closest('.btn-remove-bill-line');
+        if (!removeLine) return;
+        const block = removeLine.closest('.bill-party-block');
+        const rows = block?.querySelectorAll('.bill-line') || [];
         if (rows.length <= 1) return;
-        remove.closest('.bill-line')?.remove();
+        removeLine.closest('.bill-line')?.remove();
         recalcBillForm(form);
     });
     form.addEventListener('input', (e) => {
@@ -3259,13 +3339,20 @@ function wireBillForm(form) {
     form.addEventListener('change', () => recalcBillForm(form));
 }
 
-function collectBillItems(form) {
-    return [...form.querySelectorAll('.bill-line')].map(row => ({
+function collectBillItems(root) {
+    return [...root.querySelectorAll('.bill-line')].map(row => ({
         name: row.querySelector('[name="itemName[]"]')?.value || '',
         ctns: row.querySelector('[name="itemCtns[]"]')?.value,
         qty: row.querySelector('[name="itemQty[]"]')?.value,
         unit: row.querySelector('[name="itemUnit[]"]')?.value,
         rate: row.querySelector('[name="itemRate[]"]')?.value
+    }));
+}
+
+function collectBillParties(form) {
+    return [...form.querySelectorAll('.bill-party-block')].map(block => ({
+        customerId: block.querySelector('[name="customerId[]"]')?.value || '',
+        items: collectBillItems(block)
     }));
 }
 
@@ -3522,28 +3609,50 @@ function handleFormSubmit(formData) {
         }
         showToast(goingIn ? 'Stock in saved.' : 'Stock out saved.', 'success');
     } else if (type === 'create-bill') {
-        const customerId = formData.get('customerId');
-        if (!customerId) { showToast('Select a party for this bill.', 'error'); return false; }
-        const items = collectBillItems(form);
-        const bill = db.addBill({
-            customerId,
+        const parties = collectBillParties(form).filter(p => p.customerId);
+        if (!parties.length) { showToast('Select a party for this bill.', 'error'); return false; }
+        const shared = {
             date: formData.get('billDate'),
-            items,
             note: formData.get('note'),
             entryNo: formData.get('entryNo'),
             containerNo: formData.get('containerNo'),
             vehicleNo: formData.get('vehicleNo')
-        });
-        if (!bill) {
-            showToast('Add goods with qty and rate. Choose Per KGS, Per Pair, Per PCS, or Per CBM.', 'error');
+        };
+        if (billFormMode(form) === 'many' && parties.length > 1 && !String(shared.containerNo || '').trim()) {
+            showToast('Enter the container number so these parties stay together.', 'error');
             return false;
         }
-        const party = db.data.customers.find(c => c.id == customerId);
-        showToast(`Bill #${bill.billNo} saved. Banam posted on ${party?.name || 'khata'}.`, 'success');
+        const groupId = parties.length > 1
+            ? `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+            : '';
+        const created = [];
+        parties.forEach(party => {
+            const bill = db.addBill({
+                ...shared,
+                customerId: party.customerId,
+                items: party.items,
+                containerGroupId: groupId,
+                skipSave: true
+            });
+            if (bill) created.push(bill);
+        });
+        if (!created.length) {
+            showToast('Add goods with qty and rate for each party.', 'error');
+            return false;
+        }
+        db.save();
+        const names = created.map(bill => db.data.customers.find(c => c.id == bill.customerId)?.name).filter(Boolean);
+        if (created.length === 1) {
+            const party = names[0] || 'khata';
+            showToast(`Bill #${created[0].billNo} saved. Banam posted on ${party}.`, 'success');
+        } else {
+            showToast(`${created.length} bills saved on this container. Banam posted on each khata.`, 'success');
+        }
         updateUI();
         closeModal();
         switchView('bills');
-        printBill(bill.id);
+        if (created.length === 1) printBill(created[0].id);
+        else printBills(created.map(b => b.id), shared.containerNo ? `Container ${shared.containerNo}` : 'Container bills');
         return false;
     }
     return true;
@@ -3887,9 +3996,47 @@ function updateStockList() {
 
 function filterBillsList(query) {
     const q = (query || '').toLowerCase();
-    document.querySelectorAll('#bills-list .bill-item').forEach(row => {
+    document.querySelectorAll('#bills-list .bill-group, #bills-list .bill-item').forEach(row => {
+        if (row.closest('.bill-group') && row.classList.contains('bill-item')) return;
         row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
     });
+}
+
+function billGroupKey(bill) {
+    if (bill.containerGroupId) return `g:${bill.containerGroupId}`;
+    const container = String(bill.containerNo || '').trim().toLowerCase();
+    if (!container) return `b:${bill.id}`;
+    return `c:${bill.date || ''}|${container}|${String(bill.entryNo || '').trim().toLowerCase()}`;
+}
+
+function billListRowHtml(bill, currency, { compact } = {}) {
+    const party = db.data.customers.find(c => c.id == bill.customerId);
+    const items = (bill.items || []).map(i => billItemView(i).name).filter(Boolean).slice(0, 2).join(', ');
+    const meta = compact
+        ? `#${bill.billNo}${items ? ` · ${items}` : ''}`
+        : [
+            formatDisplayDate(bill.date),
+            bill.entryNo && `B/E ${bill.entryNo}`,
+            bill.containerNo && `Cont ${bill.containerNo}`,
+            items
+        ].filter(Boolean).join(' · ');
+    return `
+        <div class="bill-item${compact ? ' compact' : ''}" data-id="${bill.id}" role="button" tabindex="0">
+            <div class="bill-item-main">
+                <div class="bill-item-top">
+                    <strong>${escapeHtml(party?.name || 'Party removed')}</strong>
+                </div>
+                <div class="bill-item-meta">${escapeHtml(meta)}</div>
+            </div>
+            <div class="bill-item-total">
+                <strong>${escapeHtml(currency)} ${formatAmount(bill.total)}</strong>
+            </div>
+            <div class="bill-item-actions">
+                <button type="button" class="btn-icon btn-view-bill" data-id="${bill.id}" title="View / Print" aria-label="View bill"><i class="fas fa-print"></i></button>
+                <button type="button" class="btn-delete btn-delete-bill" data-id="${bill.id}" title="Delete bill" aria-label="Delete bill"><i class="fas fa-trash-alt"></i></button>
+            </div>
+        </div>
+    `;
 }
 
 function updateBillsList() {
@@ -3904,45 +4051,53 @@ function updateBillsList() {
 
     const bills = [...(db.data.bills || [])].sort((a, b) => (Number(b.billNo) || 0) - (Number(a.billNo) || 0));
     if (!bills.length) {
-        listEl.innerHTML = '<p class="empty-state">No bills yet. Tap New Bill, pick a party, and save. It will show here and as Banam on their khata.</p>';
+        listEl.innerHTML = '<p class="empty-state">No bills yet. Tap New Bill. One container with many parties can be billed together.</p>';
         return;
     }
 
-    listEl.innerHTML = bills.map(bill => {
-        const party = db.data.customers.find(c => c.id == bill.customerId);
-        const items = (bill.items || []).map(i => billItemView(i).name).filter(Boolean).slice(0, 3).join(', ');
-        const meta = [
-            formatDisplayDate(bill.date),
-            bill.entryNo && `B/E ${bill.entryNo}`,
-            bill.containerNo && `Cont ${bill.containerNo}`,
-            items
-        ].filter(Boolean).join(' · ');
+    const groups = [];
+    const index = new Map();
+    bills.forEach(bill => {
+        const key = billGroupKey(bill);
+        if (!index.has(key)) {
+            const group = { key, bills: [] };
+            index.set(key, group);
+            groups.push(group);
+        }
+        index.get(key).bills.push(bill);
+    });
+
+    listEl.innerHTML = groups.map(group => {
+        const list = group.bills.sort((a, b) => (Number(a.billNo) || 0) - (Number(b.billNo) || 0));
+        if (list.length === 1) return billListRowHtml(list[0], currency);
+        const first = list[0];
+        const total = list.reduce((sum, bill) => sum + (Number(bill.total) || 0), 0);
+        const ids = list.map(bill => bill.id).join(',');
         return `
-            <div class="bill-item" data-id="${bill.id}" role="button" tabindex="0">
-                <div class="bill-item-main">
-                    <div class="bill-item-top">
-                        <strong>Bill #${escapeHtml(bill.billNo)}</strong>
-                        <span class="khata-side-badge banam">Banam</span>
+            <div class="bill-group">
+                <div class="bill-group-head">
+                    <div>
+                        <strong>Container ${escapeHtml(first.containerNo || '—')}</strong>
+                        <div class="bill-item-meta">${escapeHtml([
+                            formatDisplayDate(first.date),
+                            first.entryNo && `B/E ${first.entryNo}`,
+                            `${list.length} parties`
+                        ].filter(Boolean).join(' · '))}</div>
                     </div>
-                    <div class="bill-item-party">${escapeHtml(party?.name || 'Party removed')}</div>
-                    <div class="bill-item-meta">${escapeHtml(meta)}</div>
+                    <div class="bill-item-total">
+                        <strong>${escapeHtml(currency)} ${formatAmount(total)}</strong>
+                    </div>
+                    <button type="button" class="btn-icon btn-print-container" data-ids="${ids}" title="Print all" aria-label="Print all bills"><i class="fas fa-print"></i></button>
                 </div>
-                <div class="bill-item-total">
-                    <strong>${escapeHtml(currency)} ${formatAmount(bill.total)}</strong>
-                    <span>On khata</span>
-                </div>
-                <div class="bill-item-actions">
-                    <button type="button" class="btn-icon btn-view-bill" data-id="${bill.id}" title="View / Print" aria-label="View bill"><i class="fas fa-print"></i></button>
-                    <button type="button" class="btn-delete btn-delete-bill" data-id="${bill.id}" title="Delete bill" aria-label="Delete bill"><i class="fas fa-trash-alt"></i></button>
+                <div class="bill-group-body">
+                    ${list.map(bill => billListRowHtml(bill, currency, { compact: true })).join('')}
                 </div>
             </div>
         `;
     }).join('');
 }
 
-function printBill(billId) {
-    const bill = (db.data.bills || []).find(b => b.id == billId);
-    if (!bill) return;
+function billPrintHtml(bill) {
     const party = db.data.customers.find(c => c.id == bill.customerId);
     const currency = db.data.settings.currency || 'Rs.';
     const shopName = db.data.settings.shopName || 'My Business';
@@ -3968,7 +4123,7 @@ function printBill(billId) {
         bill.vehicleNo ? `<div><span>Vehicle No</span><strong>${escapeHtml(bill.vehicleNo)}</strong></div>` : ''
     ].filter(Boolean).join('');
 
-    const html = `
+    return `
         <div class="print-report ledger-print-report">
             <div class="ledger-print-top">
                 <div>
@@ -4029,7 +4184,24 @@ function printBill(billId) {
             </div>
         </div>
     `;
-    showPrintPreview(html, `Bill #${bill.billNo}`);
+}
+
+function printBill(billId) {
+    const bill = (db.data.bills || []).find(b => b.id == billId);
+    if (!bill) return;
+    showPrintPreview(billPrintHtml(bill), `Bill #${bill.billNo}`);
+}
+
+function printBills(ids, title) {
+    const list = (ids || [])
+        .map(id => (db.data.bills || []).find(b => b.id == id))
+        .filter(Boolean);
+    if (!list.length) return;
+    if (list.length === 1) {
+        printBill(list[0].id);
+        return;
+    }
+    showPrintPreview(list.map(billPrintHtml).join(''), title || `Bills (${list.length})`);
 }
 
 function showToast(message, type = 'info') {
