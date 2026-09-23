@@ -1684,13 +1684,15 @@ function setupPrintPreview() {
     document.getElementById('btn-print-preview-print')?.addEventListener('click', runPrintFromPreview);
 }
 
-function showPrintPreview(html, title) {
+function showPrintPreview(html, title, hint) {
     const overlay = document.getElementById('print-preview-overlay');
     const container = document.getElementById('ledger-print-container');
     const titleEl = document.getElementById('print-preview-title');
+    const hintEl = document.getElementById('print-preview-hint');
     if (!overlay || !container) return;
     container.innerHTML = html;
     if (titleEl) titleEl.textContent = title || 'Print Preview';
+    if (hintEl) hintEl.textContent = hint || 'Check, then tap Print';
     overlay.hidden = false;
     document.body.classList.add('print-preview-open');
     overlay.querySelector('.print-preview-scroll')?.scrollTo({ top: 0 });
@@ -1923,8 +1925,14 @@ function printRoozReport(dateFilter) {
         <div class="print-report strong-report">
             <div class="print-header">
                 <h1>${escapeHtml(shopName)}</h1>
-                <h2>${showingAll ? 'All Transactions' : 'Daily Cash Book'}</h2>
+                <h2>${showingAll ? 'All Transactions' : 'Daily Book'}</h2>
                 <p>${escapeHtml(dateLabel)}</p>
+            </div>
+            <div class="invoice-kpis">
+                <div><span>Cash in</span><strong class="text-success">${escapeHtml(currency)} ${stats.income.toLocaleString()}</strong></div>
+                <div><span>Cash out</span><strong class="text-danger">${escapeHtml(currency)} ${stats.expense.toLocaleString()}</strong></div>
+                <div><span>Bills Banam</span><strong>${escapeHtml(currency)} ${billTotal.toLocaleString()}</strong></div>
+                <div><span>Cash net</span><strong class="${stats.net >= 0 ? 'text-success' : 'text-danger'}">${escapeHtml(currency)} ${stats.net.toLocaleString()}</strong></div>
             </div>
             <div class="print-columns">
                 <div class="print-column">
@@ -2018,7 +2026,7 @@ function printRoozReport(dateFilter) {
         </div>
     `;
 
-    showPrintPreview(html, 'Daily Cash Book');
+    showPrintPreview(html, showingAll ? 'All Transactions' : 'Daily Book', 'Cash in, cash out, and bill Banam — then Print');
 }
 
 function printLedgerStatement(customerId) {
@@ -2114,7 +2122,7 @@ function printLedgerStatement(customerId) {
         </div>
     `;
 
-    showPrintPreview(html, 'Account Statement');
+    showPrintPreview(html, 'Account Statement', 'Banam they owe you. Jama they paid. Then Print');
 }
 
 window.printLedgerStatement = printLedgerStatement;
@@ -4457,90 +4465,156 @@ function billPrintHtml(bill) {
     const rows = items.length
         ? items.map((item, i) => {
             totalCtns += item.ctns;
+            const meta = [
+                item.ctns ? `${formatAmount(item.ctns)} cartons` : '',
+                item.qty ? `${formatAmount(item.qty)} ${item.qtyLabel}` : '',
+                item.rate ? `${formatAmount(item.rate)} ${item.unitLabel}` : ''
+            ].filter(Boolean).join(' · ');
             return `
             <tr class="${i % 2 ? 'alt' : ''}">
-                <td class="particulars">${escapeHtml(item.name)}</td>
-                <td class="num">${item.ctns ? formatAmount(item.ctns) : '—'}</td>
-                <td class="num">${item.qty ? `${formatAmount(item.qty)} ${escapeHtml(item.qtyLabel)}` : '—'}</td>
-                <td class="num">${item.rate ? `${formatAmount(item.rate)} ${escapeHtml(item.unitLabel)}` : '—'}</td>
-                <td class="num">${formatAmount(item.amount)}</td>
+                <td class="goods">
+                    <strong>${escapeHtml(item.name)}</strong>
+                    ${meta ? `<div class="goods-meta">${escapeHtml(meta)}</div>` : ''}
+                </td>
+                <td class="num hide-phone">${item.ctns ? formatAmount(item.ctns) : '—'}</td>
+                <td class="num hide-phone">${item.qty ? `${formatAmount(item.qty)} ${escapeHtml(item.qtyLabel)}` : '—'}</td>
+                <td class="num hide-phone">${item.rate ? `${formatAmount(item.rate)} ${escapeHtml(item.unitLabel)}` : '—'}</td>
+                <td class="num amount">${escapeHtml(currency)} ${formatAmount(item.amount)}</td>
             </tr>`;
         }).join('')
-        : '<tr><td colspan="5" class="empty-cell">No goods</td></tr>';
+        : '<tr><td class="goods" colspan="5">No goods on this bill</td></tr>';
 
-    const shipBits = [
-        bill.entryNo ? `<div><span>Bill of Entry No</span><strong>${escapeHtml(bill.entryNo)}</strong></div>` : '',
-        bill.containerNo ? `<div><span>Container No</span><strong>${escapeHtml(bill.containerNo)}</strong></div>` : '',
-        bill.vehicleNo ? `<div><span>Vehicle No</span><strong>${escapeHtml(bill.vehicleNo)}</strong></div>` : ''
-    ].filter(Boolean).join('');
+    const ship = [
+        ['Date', formatDisplayDate(bill.date)],
+        bill.entryNo ? ['Bill of Entry', bill.entryNo] : null,
+        bill.containerNo ? ['Container', bill.containerNo] : null,
+        bill.vehicleNo ? ['Vehicle', bill.vehicleNo] : null
+    ].filter(Boolean);
 
     return `
-        <div class="print-report ledger-print-report">
-            <div class="ledger-print-top">
-                <div>
-                    <div class="ledger-print-shop">${escapeHtml(shopName)}</div>
-                    <div class="ledger-print-title">Bill #${escapeHtml(bill.billNo)}</div>
-                    <div class="ledger-print-period">${escapeHtml(formatDisplayDate(bill.date))}</div>
+        <article class="print-report invoice-print">
+            <header class="invoice-head">
+                <div class="invoice-brand">
+                    <div class="invoice-shop">${escapeHtml(shopName)}</div>
+                    <div class="invoice-tag">INVOICE</div>
                 </div>
-                <div class="ledger-print-issued">
-                    <div>Posted as Banam</div>
-                    <div>${party ? `Khata #${escapeHtml(party.khataNo)}` : ''}</div>
+                <div class="invoice-meta">
+                    <div><span>Bill No</span><strong>#${escapeHtml(bill.billNo)}</strong></div>
+                    <div><span>Date</span><strong>${escapeHtml(formatDisplayDate(bill.date))}</strong></div>
                 </div>
-            </div>
-            <div class="ledger-print-party">
+            </header>
+            <section class="invoice-who">
                 <div>
                     <span>Bill to</span>
                     <strong>${escapeHtml(party?.name || 'Party')}</strong>
-                    <em>${escapeHtml(party?.phone || '')}</em>
+                    <em>${[
+                        party?.khataNo ? `Khata #${party.khataNo}` : '',
+                        party?.phone || ''
+                    ].filter(Boolean).map(escapeHtml).join(' · ')}</em>
                 </div>
-                <div class="ledger-print-close">
-                    <span>How much</span>
+                <div class="invoice-total-box">
+                    <span>Total</span>
                     <strong>${escapeHtml(currency)} ${formatAmount(bill.total)}</strong>
-                    <em>Banam on khata</em>
+                    <em>Banam on this khata</em>
                 </div>
-            </div>
-            ${shipBits ? `<div class="bill-print-ship">${shipBits}</div>` : ''}
-            <table class="ledger-print-table">
+            </section>
+            ${ship.length ? `<section class="invoice-ship">${ship.map(([label, value]) => `
+                <div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>
+            `).join('')}</section>` : ''}
+            <table class="invoice-goods">
                 <thead>
                     <tr>
-                        <th>Description of goods</th>
-                        <th class="num">CTNS</th>
-                        <th class="num">Qty</th>
-                        <th class="num">Rate</th>
-                        <th class="num">How much</th>
+                        <th>Goods</th>
+                        <th class="num hide-phone">Cartons</th>
+                        <th class="num hide-phone">Qty</th>
+                        <th class="num hide-phone">Rate</th>
+                        <th class="num">Amount</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
-                <tfoot>
-                    <tr>
-                        <td>Total</td>
-                        <td class="num">${formatAmount(totalCtns)}</td>
-                        <td></td>
-                        <td></td>
-                        <td class="num">${escapeHtml(currency)} ${formatAmount(bill.total)}</td>
-                    </tr>
-                </tfoot>
             </table>
-            ${bill.note ? `<p class="ledger-print-legend">Note: ${escapeHtml(bill.note)}</p>` : ''}
-            <div class="ledger-print-summary">This bill is posted as Banam on ${escapeHtml(party?.name || 'the party')}'s khata.</div>
-            <div class="ledger-print-signs">
+            <div class="invoice-grand">
+                <span>Grand total</span>
+                <strong>${escapeHtml(currency)} ${formatAmount(bill.total)}</strong>
+            </div>
+            ${totalCtns ? `<p class="invoice-note">Cartons in this bill: ${formatAmount(totalCtns)}</p>` : ''}
+            ${bill.note ? `<p class="invoice-note">Note: ${escapeHtml(bill.note)}</p>` : ''}
+            <p class="invoice-banam">This ${escapeHtml(currency)} ${formatAmount(bill.total)} is Banam on ${escapeHtml(party?.name || 'the party')}'s khata. They owe this amount.</p>
+            <div class="invoice-signs">
                 <div>
                     <div class="sign-line"></div>
-                    <span>Customer signature</span>
+                    <span>Customer sign</span>
                 </div>
                 <div>
                     <div class="sign-line"></div>
-                    <span>Shop signature</span>
+                    <span>Shop sign</span>
                 </div>
             </div>
-        </div>
+        </article>
+    `;
+}
+
+function containerPrintCoverHtml(bills) {
+    const list = bills || [];
+    if (!list.length) return '';
+    const first = list[0];
+    const currency = db.data.settings.currency || 'Rs.';
+    const shopName = db.data.settings.shopName || 'My Business';
+    const total = list.reduce((sum, bill) => sum + (Number(bill.total) || 0), 0);
+    const rows = list.map((bill, i) => {
+        const party = db.data.customers.find(c => c.id == bill.customerId);
+        return `
+            <tr class="${i % 2 ? 'alt' : ''}">
+                <td>${escapeHtml(party?.name || 'Party')}</td>
+                <td>Bill #${escapeHtml(bill.billNo)}</td>
+                <td class="num">${escapeHtml(currency)} ${formatAmount(bill.total)}</td>
+            </tr>`;
+    }).join('');
+    const ship = [
+        first.containerNo ? ['Container', first.containerNo] : ['Container', '—'],
+        first.entryNo ? ['Bill of Entry', first.entryNo] : null,
+        ['Date', formatDisplayDate(first.date)],
+        ['Parties', String(list.length)]
+    ].filter(Boolean);
+
+    return `
+        <article class="print-report invoice-print invoice-cover">
+            <header class="invoice-head">
+                <div class="invoice-brand">
+                    <div class="invoice-shop">${escapeHtml(shopName)}</div>
+                    <div class="invoice-tag">CONTAINER</div>
+                </div>
+                <div class="invoice-meta">
+                    <div><span>Parties</span><strong>${list.length}</strong></div>
+                    <div><span>Date</span><strong>${escapeHtml(formatDisplayDate(first.date))}</strong></div>
+                </div>
+            </header>
+            <section class="invoice-ship">${ship.map(([label, value]) => `
+                <div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>
+            `).join('')}</section>
+            <table class="invoice-goods">
+                <thead>
+                    <tr>
+                        <th>Party</th>
+                        <th>Bill</th>
+                        <th class="num">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <div class="invoice-grand">
+                <span>Container total</span>
+                <strong>${escapeHtml(currency)} ${formatAmount(total)}</strong>
+            </div>
+            <p class="invoice-banam">Each party bill below is Banam on that khata. Next pages are the invoices.</p>
+        </article>
     `;
 }
 
 function printBill(billId) {
     const bill = (db.data.bills || []).find(b => b.id == billId);
     if (!bill) return;
-    showPrintPreview(billPrintHtml(bill), `Bill #${bill.billNo}`);
+    showPrintPreview(billPrintHtml(bill), `Invoice #${bill.billNo}`, 'Check the bill, then tap Print');
 }
 
 function printBills(ids, title) {
@@ -4552,7 +4626,11 @@ function printBills(ids, title) {
         printBill(list[0].id);
         return;
     }
-    showPrintPreview(list.map(billPrintHtml).join(''), title || `Bills (${list.length})`);
+    showPrintPreview(
+        containerPrintCoverHtml(list) + list.map(billPrintHtml).join(''),
+        title || `Container · ${list.length} invoices`,
+        'First page is the container total. Next pages are each party invoice.'
+    );
 }
 
 function showToast(message, type = 'info') {
