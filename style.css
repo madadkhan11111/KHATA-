@@ -1193,6 +1193,135 @@ body.dark-theme .form-group.highlight {
     color: var(--danger);
 }
 
+.bills-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.bill-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+        "main total"
+        "actions actions";
+    gap: 0.55rem 1rem;
+    padding: 0.95rem 1.05rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--bg-card);
+    cursor: pointer;
+}
+
+.bill-item-main { grid-area: main; min-width: 0; }
+.bill-item-top {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.bill-item-party {
+    margin-top: 0.2rem;
+    font-weight: 700;
+}
+.bill-item-meta {
+    margin-top: 0.2rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+.bill-item-total {
+    grid-area: total;
+    text-align: right;
+}
+.bill-item-total strong {
+    display: block;
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+.bill-item-total span {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+.bill-item-actions {
+    grid-area: actions;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.3rem;
+}
+
+.bill-line-head,
+.bill-line {
+    display: grid;
+    grid-template-columns: 1.6fr 0.7fr 0.8fr 0.7fr 36px;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.bill-line-head {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 0.35rem;
+}
+
+.bill-line {
+    margin-bottom: 0.4rem;
+}
+
+.bill-line input {
+    width: 100%;
+    min-height: 40px;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-main);
+    color: var(--text-main);
+}
+
+.bill-line-amt {
+    text-align: right;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+}
+
+.bill-form-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0.9rem;
+    margin-bottom: 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-main);
+    font-weight: 700;
+}
+
+.bill-form-total strong {
+    font-size: 1.15rem;
+}
+
+@media (max-width: 640px) {
+    .bill-line-head {
+        display: none;
+    }
+    .bill-line {
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+            "name name"
+            "qty rate"
+            "amt remove";
+    }
+    .bill-line input[name="itemName[]"] { grid-area: name; }
+    .bill-line input[name="itemQty[]"] { grid-area: qty; }
+    .bill-line input[name="itemRate[]"] { grid-area: rate; }
+    .bill-line-amt { grid-area: amt; text-align: left; padding-left: 0.2rem; }
+    .bill-line .btn-remove-bill-line { grid-area: remove; justify-self: end; }
+}
+
 .khata-filters {
     display: flex;
     gap: 0.45rem;
@@ -4222,6 +4351,7 @@ body.rtl .form-row {
     .fab-action-icon.expense { background: var(--danger); }
     .fab-action-icon.customer { background: var(--primary); }
     .fab-action-icon.stock { background: #b8892a; }
+    .fab-action-icon.bill { background: #0d7377; }
     .fab-action-icon.voice { background: #0d7377; }
 
     body.keyboard-open .bottom-nav,

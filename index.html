@@ -6,7 +6,7 @@
     <title>KhataBook Pro - Premium Ledger & Daily Cash Book</title>
     <meta name="description" content="Professional Khata Book and Rooznamcha with free cloud accounts for shops worldwide.">
     <meta name="theme-color" content="#0d7377">
-    <meta name="application-version" content="1.12.1">
+    <meta name="application-version" content="1.13.0">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="KhataPro">
@@ -22,7 +22,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.12.1">
+    <link rel="stylesheet" href="style.css?v=1.13.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -91,6 +91,10 @@
                 <a href="#" class="nav-link" data-view="stock">
                     <i class="fas fa-boxes-stacked"></i>
                     <span>Stock</span>
+                </a>
+                <a href="#" class="nav-link" data-view="bills">
+                    <i class="fas fa-file-invoice"></i>
+                    <span>Bills</span>
                 </a>
                 <a href="#" class="nav-link" data-view="reports">
                     <i class="fas fa-file-invoice-dollar"></i>
@@ -355,6 +359,37 @@
                             <input type="search" id="stock-search" placeholder="Search item..." enterkeyhint="search" autocomplete="off">
                         </div>
                         <div id="stock-list" class="stock-list"></div>
+                    </div>
+                </section>
+
+                <section id="bills-view" class="view">
+                    <div class="view-header">
+                        <div class="header-main">
+                            <h2>Bills</h2>
+                            <p class="hide-on-mobile">Make a bill for a party. It is saved here and posted as Banam on their khata.</p>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-add-bill hide-on-mobile" aria-label="New bill">
+                            <i class="fas fa-plus"></i>
+                            <span>New Bill</span>
+                        </button>
+                    </div>
+
+                    <div class="daily-summary-bar no-print" id="bills-summary-bar">
+                        <div class="day-stat net">
+                            <span class="label">Bills made</span>
+                            <span class="value" id="bills-count">0</span>
+                        </div>
+                        <div class="day-stat income">
+                            <span class="label">Billed amount</span>
+                            <span class="value" id="bills-total">0</span>
+                        </div>
+                    </div>
+
+                    <div class="content-card">
+                        <div class="party-toolbar">
+                            <input type="search" id="bills-search" placeholder="Search bill, party, or item..." enterkeyhint="search" autocomplete="off">
+                        </div>
+                        <div id="bills-list" class="bills-list"></div>
                     </div>
                 </section>
 
@@ -639,6 +674,10 @@
                     <span>Party</span>
                     <span class="fab-action-icon customer"><i class="fas fa-user-plus"></i></span>
                 </button>
+                <button type="button" class="fab-action btn-add-bill">
+                    <span>Bill</span>
+                    <span class="fab-action-icon bill"><i class="fas fa-file-invoice"></i></span>
+                </button>
                 <button type="button" class="fab-action btn-add-stock">
                     <span>Stock</span>
                     <span class="fab-action-icon stock"><i class="fas fa-boxes-stacked"></i></span>
@@ -757,8 +796,8 @@
         </div>
     </div>
 
-    <script src="site-config.js?v=1.12.1"></script>
-    <script src="cloud-auth.js?v=1.12.1"></script>
-    <script src="app.js?v=1.12.1"></script>
+    <script src="site-config.js?v=1.13.0"></script>
+    <script src="cloud-auth.js?v=1.13.0"></script>
+    <script src="app.js?v=1.13.0"></script>
 </body>
 </html>

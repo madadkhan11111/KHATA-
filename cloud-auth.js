@@ -295,8 +295,9 @@ const AccountCloud = {
         const rooz = Array.isArray(data.rooznamcha) ? data.rooznamcha : [];
         const trash = Array.isArray(data.trash) ? data.trash : [];
         const stock = Array.isArray(data.stock) ? data.stock : [];
+        const bills = Array.isArray(data.bills) ? data.bills : [];
         const tx = customers.reduce((n, c) => n + (Array.isArray(c.transactions) ? c.transactions.length : 0), 0);
-        return customers.length * 10 + rooz.length * 5 + tx + trash.length + stock.length * 4;
+        return customers.length * 10 + rooz.length * 5 + tx + trash.length + stock.length * 4 + bills.length * 6;
     },
 
     sanitizeData(data) {
@@ -307,8 +308,9 @@ const AccountCloud = {
                 customers: [],
                 rooznamcha: [],
                 stock: [],
+                bills: [],
                 trash: [],
-                settings: { shopName: 'My Business', currency: 'Rs.', language: 'en', nextKhataNo: 1, nextTransactionNo: 1001 }
+                settings: { shopName: 'My Business', currency: 'Rs.', language: 'en', nextKhataNo: 1, nextTransactionNo: 1001, nextBillNo: 1 }
             };
         }
     },
@@ -328,15 +330,18 @@ const AccountCloud = {
                         db.data = remote;
                         if (!db.data.trash) db.data.trash = [];
                         if (!Array.isArray(db.data.stock)) db.data.stock = [];
+                        if (!Array.isArray(db.data.bills)) db.data.bills = [];
                         if (!db.data.settings) {
                             db.data.settings = {
                                 shopName: 'My Business',
                                 currency: 'Rs.',
                                 language: 'en',
                                 nextKhataNo: 1,
-                                nextTransactionNo: 1001
+                                nextTransactionNo: 1001,
+                                nextBillNo: 1
                             };
                         }
+                        if (!db.data.settings.nextBillNo) db.data.settings.nextBillNo = 1;
                         localStorage.setItem('khata-data', JSON.stringify(db.data));
                         this.lastSyncError = '';
                         return;

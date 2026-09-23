@@ -20,7 +20,8 @@ const translations = {
         home: 'Home',
         dailyShort: 'Daily',
         menu: 'Menu',
-        stock: 'Stock'
+        stock: 'Stock',
+        bills: 'Bills'
     },
     ur: {
         dashboard: 'ÚˆÛŒØ´ Ø¨ÙˆØ±Úˆ',
@@ -39,7 +40,8 @@ const translations = {
         home: 'Home',
         dailyShort: 'Daily',
         menu: 'Menu',
-        stock: 'سٹاک'
+        stock: 'سٹاک',
+        bills: 'بلز'
     }
 };
 
@@ -57,6 +59,7 @@ class DataManager {
             customers: [],
             rooznamcha: [],
             stock: [],
+            bills: [],
             trash: [], // New Trash collection
             settings: {
                 shopName: 'My Business',
@@ -65,6 +68,7 @@ class DataManager {
                 backupFolderPath: null,
                 nextKhataNo: 1,
                 nextTransactionNo: 1001,
+                nextBillNo: 1,
                 openingCash: 0
             }
         };
@@ -75,8 +79,10 @@ class DataManager {
         // Ensure defaults...
         if (!this.data.trash) this.data.trash = [];
         if (!Array.isArray(this.data.stock)) this.data.stock = [];
+        if (!Array.isArray(this.data.bills)) this.data.bills = [];
         if (!this.data.settings.nextKhataNo) this.data.settings.nextKhataNo = 1;
         if (!this.data.settings.nextTransactionNo) this.data.settings.nextTransactionNo = 1001;
+        if (!this.data.settings.nextBillNo) this.data.settings.nextBillNo = 1;
         if (!this.data.settings.language) this.data.settings.language = 'en';
         if (this.data.settings.backupFolderPath === undefined) this.data.settings.backupFolderPath = null;
         if (this.data.settings.openingCash === undefined || this.data.settings.openingCash === null) {
@@ -293,6 +299,8 @@ class DataManager {
         } else if (trashItem.type === 'stock') {
             if (!Array.isArray(this.data.stock)) this.data.stock = [];
             this.data.stock.push(trashItem.data);
+        } else if (trashItem.type === 'bill') {
+            this.restoreBillRecord(trashItem.data);
         }
         this.save();
     }
@@ -357,6 +365,138 @@ class DataManager {
             deletedAt: new Date().toISOString()
         });
         this.save();
+    }
+
+    addBill({ customerId, date, items, note }) {
+        if (!Array.isArray(this.data.bills)) this.data.bills = [];
+        if (!this.data.settings.nextBillNo) this.data.settings.nextBillNo = 1;
+        const customer = this.data.customers.find(c => c.id == customerId);
+        if (!customer) return null;
+
+        const cleanItems = (items || []).map(item => {
+            const name = String(item.name || '').trim();
+            const qty = Number(item.qty) || 0;
+            const rate = Number(item.rate) || 0;
+            if (!name || qty <= 0) return null;
+            const stock = (this.data.stock || []).find(s => String(s.name).toLowerCase() === name.toLowerCase());
+            return {
+                name,
+                qty,
+                rate,
+                amount: qty * rate,
+                stockId: stock?.id || '',
+                stockOut: 0
+            };
+        }).filter(Boolean);
+
+        const total = cleanItems.reduce((sum, item) => sum + item.amount, 0);
+        if (total <= 0) return null;
+
+        cleanItems.forEach(item => {
+            if (!item.stockId) return;
+            const stock = this.data.stock.find(s => s.id == item.stockId);
+            if (!stock) return;
+            const next = (Number(stock.qty) || 0) - item.qty;
+            if (next < 0) return;
+            stock.qty = next;
+            item.stockOut = item.qty;
+        });
+
+        const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const billNo = this.data.settings.nextBillNo++;
+        const dateISO = dateToISO(date);
+        const summary = cleanItems.slice(0, 3).map(i => i.name).join(', ');
+        const khataEntryId = `${id}-khata`;
+        customer.transactions.push({
+            id: khataEntryId,
+            amount: total,
+            type: 'credit',
+            description: `Bill #${billNo}${summary ? ` — ${summary}` : ''}`,
+            date: dateISO,
+            linkedBillId: id
+        });
+        customer.balance += total;
+
+        const bill = {
+            id,
+            billNo,
+            customerId,
+            date: dateISO,
+            items: cleanItems,
+            total,
+            note: String(note || '').trim(),
+            khataEntryId,
+            createdAt: nowStamp()
+        };
+        this.data.bills.push(bill);
+        this.save();
+        return bill;
+    }
+
+    deleteBill(id) {
+        if (!Array.isArray(this.data.bills)) return;
+        const index = this.data.bills.findIndex(b => b.id == id);
+        if (index === -1) return;
+        const bill = this.data.bills.splice(index, 1)[0];
+        this.removeBillFromKhata(bill);
+        this.restoreBillStock(bill);
+        this.data.trash.push({
+            id: Date.now().toString(),
+            originalId: bill.id,
+            type: 'bill',
+            data: bill,
+            deletedAt: new Date().toISOString()
+        });
+        this.save();
+    }
+
+    removeBillFromKhata(bill) {
+        const customer = this.data.customers.find(c => c.id == bill.customerId);
+        if (!customer || !Array.isArray(customer.transactions)) return;
+        const i = customer.transactions.findIndex(t => t.linkedBillId == bill.id || t.id == bill.khataEntryId);
+        if (i === -1) return;
+        const entry = customer.transactions[i];
+        customer.balance -= (entry.type === 'credit' ? entry.amount : -entry.amount);
+        customer.transactions.splice(i, 1);
+    }
+
+    restoreBillStock(bill) {
+        (bill.items || []).forEach(item => {
+            if (!item.stockId || !item.stockOut) return;
+            const stock = (this.data.stock || []).find(s => s.id == item.stockId);
+            if (stock) stock.qty = (Number(stock.qty) || 0) + Number(item.stockOut);
+        });
+    }
+
+    restoreBillRecord(bill) {
+        if (!Array.isArray(this.data.bills)) this.data.bills = [];
+        if (this.data.bills.some(b => b.id == bill.id)) return;
+        const customer = this.data.customers.find(c => c.id == bill.customerId);
+        if (customer && !customer.transactions.some(t => t.linkedBillId == bill.id)) {
+            customer.transactions.push({
+                id: bill.khataEntryId || `${bill.id}-khata`,
+                amount: Number(bill.total) || 0,
+                type: 'credit',
+                description: `Bill #${bill.billNo}`,
+                date: bill.date,
+                linkedBillId: bill.id
+            });
+            customer.balance += Number(bill.total) || 0;
+        }
+        (bill.items || []).forEach(item => {
+            if (!item.stockId || !item.stockOut) return;
+            const stock = (this.data.stock || []).find(s => s.id == item.stockId);
+            if (!stock) return;
+            const next = (Number(stock.qty) || 0) - Number(item.stockOut);
+            stock.qty = next < 0 ? 0 : next;
+        });
+        this.data.bills.push(bill);
+    }
+
+    getBillStats() {
+        const list = Array.isArray(this.data.bills) ? this.data.bills : [];
+        const total = list.reduce((sum, bill) => sum + (Number(bill.total) || 0), 0);
+        return { count: list.length, total };
     }
 
     getStockStats() {
@@ -510,6 +650,7 @@ class DataManager {
         setNavText('rooznamcha', t.rooznamcha);
         setNavText('reports', t.reports);
         setNavText('stock', t.stock || 'Stock');
+        setNavText('bills', t.bills || 'Bills');
         setNavText('settings', t.settings);
         setNavText('trash', t.trash);
 
@@ -557,6 +698,7 @@ class DataManager {
                 customers: [],
                 rooznamcha: [],
                 stock: [],
+                bills: [],
                 trash: [],
                 settings: {
                     shopName: this.data.settings.shopName || 'My Business',
@@ -565,6 +707,7 @@ class DataManager {
                     backupFolderPath: null,
                     nextKhataNo: 1,
                     nextTransactionNo: 1001,
+                    nextBillNo: 1,
                     openingCash: 0
                 }
             };
@@ -634,6 +777,7 @@ class DataManager {
                 backupFolderPath: null,
                 nextKhataNo: 1,
                 nextTransactionNo: 1001,
+                nextBillNo: 1,
                 openingCash: 0
             };
 
@@ -641,11 +785,13 @@ class DataManager {
                 customers: imported.customers,
                 rooznamcha: imported.rooznamcha,
                 stock: Array.isArray(imported.stock) ? imported.stock : [],
+                bills: Array.isArray(imported.bills) ? imported.bills : [],
                 trash: Array.isArray(imported.trash) ? imported.trash : [],
                 settings: { ...defaults, ...(imported.settings || {}) }
             };
             if (!this.data.settings.nextKhataNo) this.data.settings.nextKhataNo = 1;
             if (!this.data.settings.nextTransactionNo) this.data.settings.nextTransactionNo = 1001;
+            if (!this.data.settings.nextBillNo) this.data.settings.nextBillNo = 1;
             this.save();
             return true;
         } catch (e) {
@@ -756,7 +902,7 @@ function getLedgerStatementModel(customerId) {
             gave: isGave ? amount : 0,
             got: isGave ? 0 : amount,
             kind: isGave ? 'gave' : 'got',
-            kindLabel: isGave ? 'Banam' : 'Jama',
+            kindLabel: t.linkedBillId ? 'Bill' : (isGave ? 'Banam' : 'Jama'),
             balance: runningBalance,
             hint: balanceHint(runningBalance)
         };
@@ -1185,6 +1331,10 @@ function setupSearchHandlers() {
 
     document.getElementById('stock-search')?.addEventListener('input', (e) => {
         filterStockList(e.target.value.toLowerCase());
+    });
+
+    document.getElementById('bills-search')?.addEventListener('input', (e) => {
+        filterBillsList(e.target.value.toLowerCase());
     });
 
     document.getElementById('stock-filters')?.addEventListener('click', (e) => {
@@ -2408,6 +2558,12 @@ function setupModalHandlers() {
             return;
         }
 
+        const billItem = e.target.closest('.bill-item');
+        if (billItem?.dataset.id && !e.target.closest('button, a')) {
+            printBill(billItem.dataset.id);
+            return;
+        }
+
         const reportEntry = e.target.closest('.report-entry');
         if (reportEntry?.dataset.id) {
             const entry = db.data.rooznamcha.find(en => en.id == reportEntry.dataset.id);
@@ -2444,6 +2600,14 @@ function setupModalHandlers() {
             openModal('Add Party', 'add-customer');
         } else if (target.classList.contains('btn-add-stock')) {
             openModal('Add Item', 'stock-item');
+        } else if (target.classList.contains('btn-add-bill')) {
+            if (!db.data.customers.length) {
+                showToast('Add a party first, then make a bill.', 'error');
+                return;
+            }
+            openModal('New Bill', 'create-bill');
+        } else if (target.classList.contains('btn-print-bill') || target.classList.contains('btn-view-bill')) {
+            printBill(target.dataset.id);
         } else if (target.classList.contains('btn-edit-stock')) {
             const item = db.data.stock.find(s => s.id == target.dataset.id);
             if (item) openModal('Edit Item', 'stock-item', item);
@@ -2523,6 +2687,13 @@ function setupModalHandlers() {
             if (confirm('Delete this stock item?')) {
                 db.deleteStockItem(stockId);
                 showUndoToast('Item deleted');
+                updateUI();
+            }
+        } else if (target.closest('.btn-delete-bill')) {
+            const billId = target.closest('.btn-delete-bill').dataset.id;
+            if (confirm('Delete this bill? Banam will be removed from the party khata.')) {
+                db.deleteBill(billId);
+                showUndoToast('Bill deleted');
                 updateUI();
             }
         }
@@ -2655,9 +2826,10 @@ function openModal(title, type, data = null) {
     }
 
     form.innerHTML = renderForm(type, data);
-    modal.querySelector('.modal-card')?.classList.toggle('modal-wide', type === 'view-ledger');
+    modal.querySelector('.modal-card')?.classList.toggle('modal-wide', type === 'view-ledger' || type === 'create-bill' || type === 'view-bill');
     modal.classList.add('active');
     document.body.classList.add('modal-open');
+    if (type === 'create-bill') wireBillForm(form);
 }
 
 function renderForm(type, data = null) {
@@ -2797,6 +2969,10 @@ function renderForm(type, data = null) {
         }
         case 'view-ledger':
             return `<div id="ledger-statement-view"></div>`;
+        case 'create-bill':
+            return renderCreateBillForm();
+        case 'view-bill':
+            return `<div id="bill-view-card"></div>`;
         case 'stock-item': {
             const isEdit = !!(data && data.id);
             const unit = data?.unit || 'pcs';
@@ -2861,6 +3037,117 @@ function renderForm(type, data = null) {
         }
         default: return '';
     }
+}
+
+function stockOptionsList() {
+    return (db.data.stock || []).map(s => `<option value="${escapeHtml(s.name)}"></option>`).join('');
+}
+
+function billLineHtml() {
+    return `
+        <div class="bill-line">
+            <input type="text" name="itemName[]" list="bill-stock-list" placeholder="Item name" autocomplete="off">
+            <input type="number" name="itemQty[]" inputmode="decimal" step="0.01" min="0" placeholder="Qty">
+            <input type="number" name="itemRate[]" inputmode="decimal" step="0.01" min="0" placeholder="Rate">
+            <span class="bill-line-amt">0</span>
+            <button type="button" class="btn-icon btn-remove-bill-line" aria-label="Remove item">&times;</button>
+        </div>
+    `;
+}
+
+function renderCreateBillForm() {
+    const parties = [...(db.data.customers || [])]
+        .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+        .map(c => `<option value="${c.id}">${escapeHtml(c.name)} · #${escapeHtml(c.khataNo)}</option>`)
+        .join('');
+    return `
+        <p class="form-hint">This bill is saved on the Bills page and posted as Banam on the party's khata.</p>
+        <div class="form-group">
+            <label>Party</label>
+            <select name="customerId" required>
+                <option value="">Select party</option>
+                ${parties}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Date</label>
+            <input type="date" name="billDate" value="${localISODate()}" required>
+        </div>
+        <div class="form-group">
+            <label>Items</label>
+            <div class="bill-line-head">
+                <span>Item</span><span>Qty</span><span>Rate</span><span>Amount</span><span></span>
+            </div>
+            <div id="bill-lines">${billLineHtml()}${billLineHtml()}</div>
+            <datalist id="bill-stock-list">${stockOptionsList()}</datalist>
+            <button type="button" class="btn btn-secondary" id="btn-add-bill-line" style="margin-top:0.55rem;">
+                <i class="fas fa-plus"></i> Add item
+            </button>
+        </div>
+        <div class="bill-form-total">
+            Total <strong id="bill-form-total">0</strong>
+        </div>
+        <div class="form-group">
+            <label>Note (optional)</label>
+            <input type="text" name="note" placeholder="e.g. Shop delivery, cash later">
+        </div>
+        <div class="modal-footer">
+            <button type="submit" class="btn btn-primary full-width">Save bill as Banam</button>
+        </div>
+    `;
+}
+
+function recalcBillForm(form) {
+    if (!form) return;
+    const currency = db.data.settings.currency || 'Rs.';
+    let total = 0;
+    form.querySelectorAll('.bill-line').forEach(row => {
+        const qty = Number(row.querySelector('[name="itemQty[]"]')?.value) || 0;
+        const rate = Number(row.querySelector('[name="itemRate[]"]')?.value) || 0;
+        const amount = qty * rate;
+        total += amount;
+        const amt = row.querySelector('.bill-line-amt');
+        if (amt) amt.textContent = amount ? formatAmount(amount) : '0';
+    });
+    const totalEl = form.querySelector('#bill-form-total');
+    if (totalEl) totalEl.textContent = formatMoney(total, currency);
+}
+
+function wireBillForm(form) {
+    if (!form) return;
+    const lines = form.querySelector('#bill-lines');
+    recalcBillForm(form);
+    form.querySelector('#btn-add-bill-line')?.addEventListener('click', () => {
+        lines?.insertAdjacentHTML('beforeend', billLineHtml());
+        recalcBillForm(form);
+    });
+    form.addEventListener('click', (e) => {
+        const remove = e.target.closest('.btn-remove-bill-line');
+        if (!remove) return;
+        const rows = form.querySelectorAll('.bill-line');
+        if (rows.length <= 1) return;
+        remove.closest('.bill-line')?.remove();
+        recalcBillForm(form);
+    });
+    form.addEventListener('input', (e) => {
+        const row = e.target.closest('.bill-line');
+        if (e.target.name === 'itemName[]' && row) {
+            const stock = (db.data.stock || []).find(s => String(s.name).toLowerCase() === e.target.value.toLowerCase());
+            const rateInput = row.querySelector('[name="itemRate[]"]');
+            if (stock && rateInput && !rateInput.value) {
+                rateInput.value = stock.sellPrice || stock.buyPrice || '';
+            }
+        }
+        recalcBillForm(form);
+    });
+}
+
+function collectBillItems(form) {
+    return [...form.querySelectorAll('.bill-line')].map(row => ({
+        name: row.querySelector('[name="itemName[]"]')?.value || '',
+        qty: row.querySelector('[name="itemQty[]"]')?.value,
+        rate: row.querySelector('[name="itemRate[]"]')?.value
+    }));
 }
 
 function renderLedgerStatement(customerId) {
@@ -3115,6 +3402,27 @@ function handleFormSubmit(formData) {
             return false;
         }
         showToast(goingIn ? 'Stock in saved.' : 'Stock out saved.', 'success');
+    } else if (type === 'create-bill') {
+        const customerId = formData.get('customerId');
+        if (!customerId) { showToast('Select a party for this bill.', 'error'); return false; }
+        const items = collectBillItems(form);
+        const bill = db.addBill({
+            customerId,
+            date: formData.get('billDate'),
+            items,
+            note: formData.get('note')
+        });
+        if (!bill) {
+            showToast('Add at least one item with quantity and rate.', 'error');
+            return false;
+        }
+        const party = db.data.customers.find(c => c.id == customerId);
+        showToast(`Bill #${bill.billNo} saved. Banam posted on ${party?.name || 'khata'}.`, 'success');
+        updateUI();
+        closeModal();
+        switchView('bills');
+        printBill(bill.id);
+        return false;
     }
     return true;
 }
@@ -3133,6 +3441,7 @@ function updateUI(dateFilter = null, searchQuery = "") {
     updateRooznamchaLists(effectiveDateFilter, searchQuery);
     updateCustomerLists();
     updateStockList();
+    updateBillsList();
     updateTrashList();
     updateCharts();
     updateReportsPage();
@@ -3149,6 +3458,8 @@ function updateTrashList() {
             details = `<strong>Customer:</strong> ${item.data.name} (Khata: ${item.data.khataNo})`;
         } else if (item.type === 'stock') {
             details = `<strong>Stock:</strong> ${item.data.name || 'Item'} (${item.data.qty || 0} ${item.data.unit || 'pcs'})`;
+        } else if (item.type === 'bill') {
+            details = `<strong>Bill #${item.data.billNo || ''}:</strong> ${currency} ${(Number(item.data.total) || 0).toLocaleString()}`;
         } else {
             // Fix: Handle transaction data properly
             const amount = item.data.amount ? item.data.amount.toLocaleString() : '0';
@@ -3450,6 +3761,135 @@ function updateStockList() {
             </div>
         `;
     }).join('');
+}
+
+function filterBillsList(query) {
+    const q = (query || '').toLowerCase();
+    document.querySelectorAll('#bills-list .bill-item').forEach(row => {
+        row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+}
+
+function updateBillsList() {
+    const listEl = document.getElementById('bills-list');
+    if (!listEl) return;
+    const currency = db.data.settings.currency || 'Rs.';
+    const stats = db.getBillStats();
+    const countEl = document.getElementById('bills-count');
+    const totalEl = document.getElementById('bills-total');
+    if (countEl) countEl.textContent = String(stats.count);
+    if (totalEl) totalEl.textContent = formatMoney(stats.total, currency);
+
+    const bills = [...(db.data.bills || [])].sort((a, b) => (Number(b.billNo) || 0) - (Number(a.billNo) || 0));
+    if (!bills.length) {
+        listEl.innerHTML = '<p class="empty-state">No bills yet. Tap New Bill, pick a party, and save. It will show here and as Banam on their khata.</p>';
+        return;
+    }
+
+    listEl.innerHTML = bills.map(bill => {
+        const party = db.data.customers.find(c => c.id == bill.customerId);
+        const items = (bill.items || []).map(i => i.name).filter(Boolean).slice(0, 3).join(', ');
+        return `
+            <div class="bill-item" data-id="${bill.id}" role="button" tabindex="0">
+                <div class="bill-item-main">
+                    <div class="bill-item-top">
+                        <strong>Bill #${escapeHtml(bill.billNo)}</strong>
+                        <span class="khata-side-badge banam">Banam</span>
+                    </div>
+                    <div class="bill-item-party">${escapeHtml(party?.name || 'Party removed')}</div>
+                    <div class="bill-item-meta">
+                        ${escapeHtml(formatDisplayDate(bill.date))}
+                        ${items ? ` · ${escapeHtml(items)}` : ''}
+                    </div>
+                </div>
+                <div class="bill-item-total">
+                    <strong>${escapeHtml(currency)} ${formatAmount(bill.total)}</strong>
+                    <span>On khata</span>
+                </div>
+                <div class="bill-item-actions">
+                    <button type="button" class="btn-icon btn-view-bill" data-id="${bill.id}" title="View / Print" aria-label="View bill"><i class="fas fa-print"></i></button>
+                    <button type="button" class="btn-delete btn-delete-bill" data-id="${bill.id}" title="Delete bill" aria-label="Delete bill"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function printBill(billId) {
+    const bill = (db.data.bills || []).find(b => b.id == billId);
+    if (!bill) return;
+    const party = db.data.customers.find(c => c.id == bill.customerId);
+    const currency = db.data.settings.currency || 'Rs.';
+    const shopName = db.data.settings.shopName || 'My Business';
+    const items = bill.items || [];
+    const rows = items.length
+        ? items.map((item, i) => `
+            <tr class="${i % 2 ? 'alt' : ''}">
+                <td>${escapeHtml(item.name)}</td>
+                <td class="num">${formatAmount(item.qty)}</td>
+                <td class="num">${formatAmount(item.rate)}</td>
+                <td class="num">${formatAmount(item.amount || (item.qty * item.rate))}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="4" class="empty-cell">No items</td></tr>';
+
+    const html = `
+        <div class="print-report ledger-print-report">
+            <div class="ledger-print-top">
+                <div>
+                    <div class="ledger-print-shop">${escapeHtml(shopName)}</div>
+                    <div class="ledger-print-title">Bill #${escapeHtml(bill.billNo)}</div>
+                    <div class="ledger-print-period">${escapeHtml(formatDisplayDate(bill.date))}</div>
+                </div>
+                <div class="ledger-print-issued">
+                    <div>Posted as Banam</div>
+                    <div>${party ? `Khata #${escapeHtml(party.khataNo)}` : ''}</div>
+                </div>
+            </div>
+            <div class="ledger-print-party">
+                <div>
+                    <span>Bill to</span>
+                    <strong>${escapeHtml(party?.name || 'Party')}</strong>
+                    <em>${escapeHtml(party?.phone || '')}</em>
+                </div>
+                <div class="ledger-print-close">
+                    <span>Amount</span>
+                    <strong>${escapeHtml(currency)} ${formatAmount(bill.total)}</strong>
+                    <em>Banam on khata</em>
+                </div>
+            </div>
+            <table class="ledger-print-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th class="num">Qty</th>
+                        <th class="num">Rate</th>
+                        <th class="num">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3">Total</td>
+                        <td class="num">${escapeHtml(currency)} ${formatAmount(bill.total)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+            ${bill.note ? `<p class="ledger-print-legend">Note: ${escapeHtml(bill.note)}</p>` : ''}
+            <div class="ledger-print-summary">This bill is posted as Banam on ${escapeHtml(party?.name || 'the party')}'s khata.</div>
+            <div class="ledger-print-signs">
+                <div>
+                    <div class="sign-line"></div>
+                    <span>Customer signature</span>
+                </div>
+                <div>
+                    <div class="sign-line"></div>
+                    <span>Shop signature</span>
+                </div>
+            </div>
+        </div>
+    `;
+    showPrintPreview(html, `Bill #${bill.billNo}`);
 }
 
 function showToast(message, type = 'info') {
