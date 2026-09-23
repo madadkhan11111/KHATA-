@@ -1253,13 +1253,13 @@ body.dark-theme .form-group.highlight {
 .bill-line-head,
 .bill-line {
     display: grid;
-    grid-template-columns: 1.7fr 0.55fr 0.7fr 0.7fr 0.75fr 36px;
-    gap: 0.4rem;
+    grid-template-columns: 1.45fr 0.48fr 0.55fr 0.82fr 0.55fr 0.7fr 36px;
+    gap: 0.35rem;
     align-items: center;
 }
 
 .bill-line-head {
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -1271,14 +1271,16 @@ body.dark-theme .form-group.highlight {
     margin-bottom: 0.4rem;
 }
 
-.bill-line input {
+.bill-line input,
+.bill-line select {
     width: 100%;
     min-height: 40px;
-    padding: 0.4rem 0.5rem;
+    padding: 0.4rem 0.45rem;
     border: 1px solid var(--border);
     border-radius: 10px;
     background: var(--bg-main);
     color: var(--text-main);
+    font: inherit;
 }
 
 .bill-line-amt {
@@ -1336,14 +1338,15 @@ body.dark-theme .form-group.highlight {
         grid-template-columns: 1fr 1fr;
         grid-template-areas:
             "name name"
-            "ctns weight"
-            "perkg amt"
-            "remove remove";
+            "ctns qty"
+            "unit rate"
+            "amt remove";
     }
     .bill-line input[name="itemName[]"] { grid-area: name; }
     .bill-line input[name="itemCtns[]"] { grid-area: ctns; }
-    .bill-line input[name="itemWeight[]"] { grid-area: weight; }
-    .bill-line input[name="itemPerKg[]"] { grid-area: perkg; }
+    .bill-line input[name="itemQty[]"] { grid-area: qty; }
+    .bill-line select[name="itemUnit[]"] { grid-area: unit; }
+    .bill-line input[name="itemRate[]"] { grid-area: rate; }
     .bill-line-amt { grid-area: amt; text-align: left; padding-left: 0.2rem; }
     .bill-line .btn-remove-bill-line { grid-area: remove; justify-self: end; }
 }

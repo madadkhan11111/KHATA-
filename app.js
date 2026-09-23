@@ -375,20 +375,21 @@ class DataManager {
 
         const cleanItems = (items || []).map(item => {
             const name = String(item.name || item.description || '').trim();
+            const unit = normalizeBillUnit(item.unit);
             const ctns = Number(item.ctns) || 0;
-            const weight = Number(item.weight) || 0;
-            const perKg = Number(item.perKg ?? item.rate) || 0;
-            const qty = weight || ctns || Number(item.qty) || 0;
-            const amount = billLineAmount({ name, ctns, weight, perKg, qty, rate: perKg });
+            const qty = Number(item.qty) || Number(item.weight) || 0;
+            const rate = Number(item.rate ?? item.perKg) || 0;
+            const amount = billLineAmount({ name, unit, ctns, qty, rate, weight: qty });
             if (!name || amount <= 0) return null;
             const stock = (this.data.stock || []).find(s => String(s.name).toLowerCase() === name.toLowerCase());
             return {
                 name,
+                unit,
                 ctns,
-                weight,
-                perKg,
                 qty,
-                rate: perKg,
+                weight: unit === 'kg' ? qty : 0,
+                rate,
+                perKg: unit === 'kg' ? rate : 0,
                 amount,
                 stockId: stock?.id || '',
                 stockOut: 0
@@ -402,7 +403,7 @@ class DataManager {
             if (!item.stockId) return;
             const stock = this.data.stock.find(s => s.id == item.stockId);
             if (!stock) return;
-            const take = item.weight || item.ctns || item.qty;
+            const take = item.qty || item.weight || item.ctns;
             const next = (Number(stock.qty) || 0) - take;
             if (next < 0) return;
             stock.qty = next;
@@ -3053,24 +3054,62 @@ function renderForm(type, data = null) {
     }
 }
 
+function normalizeBillUnit(unit) {
+    const value = String(unit || 'kg').toLowerCase();
+    if (value === 'pair' || value === 'pcs' || value === 'cbm') return value;
+    return 'kg';
+}
+
+function billRateLabel(unit) {
+    return {
+        kg: 'Per KGS',
+        pair: 'Per Pair',
+        pcs: 'Per PCS',
+        cbm: 'Per CBM'
+    }[normalizeBillUnit(unit)];
+}
+
+function billQtyLabel(unit) {
+    return {
+        kg: 'KGS',
+        pair: 'Pairs',
+        pcs: 'PCS',
+        cbm: 'CBM'
+    }[normalizeBillUnit(unit)];
+}
+
+function billUnitOptions(selected) {
+    const current = normalizeBillUnit(selected);
+    return ['kg', 'pair', 'pcs', 'cbm'].map(unit => (
+        `<option value="${unit}" ${unit === current ? 'selected' : ''}>${billRateLabel(unit)}</option>`
+    )).join('');
+}
+
 function billLineAmount(item) {
-    const weight = Number(item.weight) || 0;
-    const perKg = Number(item.perKg ?? item.rate) || 0;
+    const unit = normalizeBillUnit(item.unit);
+    const rate = Number(item.rate ?? item.perKg) || 0;
+    const qty = Number(item.qty) || (unit === 'kg' ? Number(item.weight) : 0) || 0;
+    if (qty > 0 && rate > 0) return qty * rate;
     const ctns = Number(item.ctns) || 0;
-    if (weight > 0 && perKg > 0) return weight * perKg;
-    if (ctns > 0 && perKg > 0) return ctns * perKg;
-    const qty = Number(item.qty) || 0;
-    const rate = Number(item.rate) || 0;
-    return qty * rate;
+    if (ctns > 0 && rate > 0) return ctns * rate;
+    return 0;
 }
 
 function billItemView(item) {
-    const name = item?.name || item?.description || '';
-    const ctns = Number(item?.ctns) || 0;
-    const weight = Number(item?.weight) || 0;
-    const perKg = Number(item?.perKg ?? item?.rate) || 0;
-    const amount = Number(item?.amount) || billLineAmount(item || {});
-    return { name, ctns, weight, perKg, amount };
+    const unit = normalizeBillUnit(item?.unit || ((item?.weight || item?.perKg) ? 'kg' : 'kg'));
+    const qty = Number(item?.qty) || Number(item?.weight) || 0;
+    const rate = Number(item?.rate ?? item?.perKg) || 0;
+    return {
+        name: item?.name || item?.description || '',
+        unit,
+        unitLabel: billRateLabel(unit),
+        qtyLabel: billQtyLabel(unit),
+        ctns: Number(item?.ctns) || 0,
+        qty,
+        weight: unit === 'kg' ? qty : Number(item?.weight) || 0,
+        rate,
+        amount: Number(item?.amount) || billLineAmount({ ...item, unit, qty, rate })
+    };
 }
 
 function stockOptionsList() {
@@ -3082,8 +3121,9 @@ function billLineHtml() {
         <div class="bill-line">
             <input type="text" name="itemName[]" list="bill-stock-list" placeholder="Description of goods" autocomplete="off">
             <input type="number" name="itemCtns[]" inputmode="decimal" step="0.01" min="0" placeholder="CTNS">
-            <input type="number" name="itemWeight[]" inputmode="decimal" step="0.01" min="0" placeholder="Weight">
-            <input type="number" name="itemPerKg[]" inputmode="decimal" step="0.01" min="0" placeholder="Per KG">
+            <input type="number" name="itemQty[]" inputmode="decimal" step="0.01" min="0" placeholder="KGS">
+            <select name="itemUnit[]">${billUnitOptions('kg')}</select>
+            <input type="number" name="itemRate[]" inputmode="decimal" step="0.01" min="0" placeholder="Rate">
             <span class="bill-line-amt">0</span>
             <button type="button" class="btn-icon btn-remove-bill-line" aria-label="Remove item">&times;</button>
         </div>
@@ -3096,7 +3136,7 @@ function renderCreateBillForm() {
         .map(c => `<option value="${c.id}">${escapeHtml(c.name)} · #${escapeHtml(c.khataNo)}</option>`)
         .join('');
     return `
-        <p class="form-hint">Amount is Weight × Per KG. This bill is saved here and posted as Banam on the party's khata.</p>
+        <p class="form-hint">How much = Qty × Rate. Choose Per KGS, Per Pair, Per PCS, or Per CBM for each item. CTNS is cartons only.</p>
         <div class="form-row">
             <div class="form-group flex-1">
                 <label>Party</label>
@@ -3129,8 +3169,9 @@ function renderCreateBillForm() {
             <div class="bill-line-head">
                 <span>Description of goods</span>
                 <span>CTNS</span>
-                <span>Weight (KGS)</span>
-                <span>Per KG</span>
+                <span>Qty</span>
+                <span>Rate type</span>
+                <span>Rate</span>
                 <span>How much</span>
                 <span></span>
             </div>
@@ -3141,7 +3182,7 @@ function renderCreateBillForm() {
             </button>
         </div>
         <div class="bill-form-total">
-            <span id="bill-form-counts">0 CTNS · 0 KGS</span>
+            <span id="bill-form-counts">0 CTNS</span>
             <strong id="bill-form-total">0</strong>
         </div>
         <div class="form-group">
@@ -3159,24 +3200,33 @@ function recalcBillForm(form) {
     const currency = db.data.settings.currency || 'Rs.';
     let total = 0;
     let ctns = 0;
-    let weight = 0;
+    const qtyByUnit = { kg: 0, pair: 0, pcs: 0, cbm: 0 };
     form.querySelectorAll('.bill-line').forEach(row => {
         const item = {
             ctns: row.querySelector('[name="itemCtns[]"]')?.value,
-            weight: row.querySelector('[name="itemWeight[]"]')?.value,
-            perKg: row.querySelector('[name="itemPerKg[]"]')?.value
+            qty: row.querySelector('[name="itemQty[]"]')?.value,
+            unit: row.querySelector('[name="itemUnit[]"]')?.value,
+            rate: row.querySelector('[name="itemRate[]"]')?.value
         };
+        const unit = normalizeBillUnit(item.unit);
         const amount = billLineAmount(item);
         total += amount;
         ctns += Number(item.ctns) || 0;
-        weight += Number(item.weight) || 0;
+        qtyByUnit[unit] += Number(item.qty) || 0;
         const amt = row.querySelector('.bill-line-amt');
         if (amt) amt.textContent = amount ? formatAmount(amount) : '0';
+        const qtyInput = row.querySelector('[name="itemQty[]"]');
+        if (qtyInput) qtyInput.placeholder = billQtyLabel(unit);
     });
     const totalEl = form.querySelector('#bill-form-total');
     const countsEl = form.querySelector('#bill-form-counts');
     if (totalEl) totalEl.textContent = formatMoney(total, currency);
-    if (countsEl) countsEl.textContent = `${formatAmount(ctns)} CTNS · ${formatAmount(weight)} KGS`;
+    const parts = [`${formatAmount(ctns)} CTNS`];
+    if (qtyByUnit.kg) parts.push(`${formatAmount(qtyByUnit.kg)} KGS`);
+    if (qtyByUnit.pair) parts.push(`${formatAmount(qtyByUnit.pair)} Pair`);
+    if (qtyByUnit.pcs) parts.push(`${formatAmount(qtyByUnit.pcs)} PCS`);
+    if (qtyByUnit.cbm) parts.push(`${formatAmount(qtyByUnit.cbm)} CBM`);
+    if (countsEl) countsEl.textContent = parts.join(' · ');
 }
 
 function wireBillForm(form) {
@@ -3199,21 +3249,23 @@ function wireBillForm(form) {
         const row = e.target.closest('.bill-line');
         if (e.target.name === 'itemName[]' && row) {
             const stock = (db.data.stock || []).find(s => String(s.name).toLowerCase() === e.target.value.toLowerCase());
-            const rateInput = row.querySelector('[name="itemPerKg[]"]');
+            const rateInput = row.querySelector('[name="itemRate[]"]');
             if (stock && rateInput && !rateInput.value) {
                 rateInput.value = stock.sellPrice || stock.buyPrice || '';
             }
         }
         recalcBillForm(form);
     });
+    form.addEventListener('change', () => recalcBillForm(form));
 }
 
 function collectBillItems(form) {
     return [...form.querySelectorAll('.bill-line')].map(row => ({
         name: row.querySelector('[name="itemName[]"]')?.value || '',
         ctns: row.querySelector('[name="itemCtns[]"]')?.value,
-        weight: row.querySelector('[name="itemWeight[]"]')?.value,
-        perKg: row.querySelector('[name="itemPerKg[]"]')?.value
+        qty: row.querySelector('[name="itemQty[]"]')?.value,
+        unit: row.querySelector('[name="itemUnit[]"]')?.value,
+        rate: row.querySelector('[name="itemRate[]"]')?.value
     }));
 }
 
@@ -3483,7 +3535,7 @@ function handleFormSubmit(formData) {
             vehicleNo: formData.get('vehicleNo')
         });
         if (!bill) {
-            showToast('Add goods with weight and per KG, or CTNS and per KG.', 'error');
+            showToast('Add goods with qty and rate. Choose Per KGS, Per Pair, Per PCS, or Per CBM.', 'error');
             return false;
         }
         const party = db.data.customers.find(c => c.id == customerId);
@@ -3896,17 +3948,15 @@ function printBill(billId) {
     const shopName = db.data.settings.shopName || 'My Business';
     const items = (bill.items || []).map(billItemView);
     let totalCtns = 0;
-    let totalWeight = 0;
     const rows = items.length
         ? items.map((item, i) => {
             totalCtns += item.ctns;
-            totalWeight += item.weight;
             return `
             <tr class="${i % 2 ? 'alt' : ''}">
                 <td class="particulars">${escapeHtml(item.name)}</td>
                 <td class="num">${item.ctns ? formatAmount(item.ctns) : '—'}</td>
-                <td class="num">${item.weight ? formatAmount(item.weight) : '—'}</td>
-                <td class="num">${item.perKg ? formatAmount(item.perKg) : '—'}</td>
+                <td class="num">${item.qty ? `${formatAmount(item.qty)} ${escapeHtml(item.qtyLabel)}` : '—'}</td>
+                <td class="num">${item.rate ? `${formatAmount(item.rate)} ${escapeHtml(item.unitLabel)}` : '—'}</td>
                 <td class="num">${formatAmount(item.amount)}</td>
             </tr>`;
         }).join('')
@@ -3949,8 +3999,8 @@ function printBill(billId) {
                     <tr>
                         <th>Description of goods</th>
                         <th class="num">CTNS</th>
-                        <th class="num">Weight (KGS)</th>
-                        <th class="num">Per KG</th>
+                        <th class="num">Qty</th>
+                        <th class="num">Rate</th>
                         <th class="num">How much</th>
                     </tr>
                 </thead>
@@ -3959,7 +4009,7 @@ function printBill(billId) {
                     <tr>
                         <td>Total</td>
                         <td class="num">${formatAmount(totalCtns)}</td>
-                        <td class="num">${formatAmount(totalWeight)}</td>
+                        <td></td>
                         <td></td>
                         <td class="num">${escapeHtml(currency)} ${formatAmount(bill.total)}</td>
                     </tr>
