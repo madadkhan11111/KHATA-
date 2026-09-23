@@ -367,23 +367,29 @@ class DataManager {
         this.save();
     }
 
-    addBill({ customerId, date, items, note }) {
+    addBill({ customerId, date, items, note, entryNo, containerNo, vehicleNo }) {
         if (!Array.isArray(this.data.bills)) this.data.bills = [];
         if (!this.data.settings.nextBillNo) this.data.settings.nextBillNo = 1;
         const customer = this.data.customers.find(c => c.id == customerId);
         if (!customer) return null;
 
         const cleanItems = (items || []).map(item => {
-            const name = String(item.name || '').trim();
-            const qty = Number(item.qty) || 0;
-            const rate = Number(item.rate) || 0;
-            if (!name || qty <= 0) return null;
+            const name = String(item.name || item.description || '').trim();
+            const ctns = Number(item.ctns) || 0;
+            const weight = Number(item.weight) || 0;
+            const perKg = Number(item.perKg ?? item.rate) || 0;
+            const qty = weight || ctns || Number(item.qty) || 0;
+            const amount = billLineAmount({ name, ctns, weight, perKg, qty, rate: perKg });
+            if (!name || amount <= 0) return null;
             const stock = (this.data.stock || []).find(s => String(s.name).toLowerCase() === name.toLowerCase());
             return {
                 name,
+                ctns,
+                weight,
+                perKg,
                 qty,
-                rate,
-                amount: qty * rate,
+                rate: perKg,
+                amount,
                 stockId: stock?.id || '',
                 stockOut: 0
             };
@@ -396,22 +402,27 @@ class DataManager {
             if (!item.stockId) return;
             const stock = this.data.stock.find(s => s.id == item.stockId);
             if (!stock) return;
-            const next = (Number(stock.qty) || 0) - item.qty;
+            const take = item.weight || item.ctns || item.qty;
+            const next = (Number(stock.qty) || 0) - take;
             if (next < 0) return;
             stock.qty = next;
-            item.stockOut = item.qty;
+            item.stockOut = take;
         });
 
         const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const billNo = this.data.settings.nextBillNo++;
         const dateISO = dateToISO(date);
         const summary = cleanItems.slice(0, 3).map(i => i.name).join(', ');
+        const entryNoText = String(entryNo || '').trim();
+        const containerText = String(containerNo || '').trim();
+        const vehicleText = String(vehicleNo || '').trim();
         const khataEntryId = `${id}-khata`;
+        const extra = [entryNoText && `B/E ${entryNoText}`, containerText && `Cont ${containerText}`].filter(Boolean).join(' · ');
         customer.transactions.push({
             id: khataEntryId,
             amount: total,
             type: 'credit',
-            description: `Bill #${billNo}${summary ? ` — ${summary}` : ''}`,
+            description: `Bill #${billNo}${summary ? ` — ${summary}` : ''}${extra ? ` (${extra})` : ''}`,
             date: dateISO,
             linkedBillId: id
         });
@@ -425,6 +436,9 @@ class DataManager {
             items: cleanItems,
             total,
             note: String(note || '').trim(),
+            entryNo: entryNoText,
+            containerNo: containerText,
+            vehicleNo: vehicleText,
             khataEntryId,
             createdAt: nowStamp()
         };
@@ -3039,6 +3053,26 @@ function renderForm(type, data = null) {
     }
 }
 
+function billLineAmount(item) {
+    const weight = Number(item.weight) || 0;
+    const perKg = Number(item.perKg ?? item.rate) || 0;
+    const ctns = Number(item.ctns) || 0;
+    if (weight > 0 && perKg > 0) return weight * perKg;
+    if (ctns > 0 && perKg > 0) return ctns * perKg;
+    const qty = Number(item.qty) || 0;
+    const rate = Number(item.rate) || 0;
+    return qty * rate;
+}
+
+function billItemView(item) {
+    const name = item?.name || item?.description || '';
+    const ctns = Number(item?.ctns) || 0;
+    const weight = Number(item?.weight) || 0;
+    const perKg = Number(item?.perKg ?? item?.rate) || 0;
+    const amount = Number(item?.amount) || billLineAmount(item || {});
+    return { name, ctns, weight, perKg, amount };
+}
+
 function stockOptionsList() {
     return (db.data.stock || []).map(s => `<option value="${escapeHtml(s.name)}"></option>`).join('');
 }
@@ -3046,9 +3080,10 @@ function stockOptionsList() {
 function billLineHtml() {
     return `
         <div class="bill-line">
-            <input type="text" name="itemName[]" list="bill-stock-list" placeholder="Item name" autocomplete="off">
-            <input type="number" name="itemQty[]" inputmode="decimal" step="0.01" min="0" placeholder="Qty">
-            <input type="number" name="itemRate[]" inputmode="decimal" step="0.01" min="0" placeholder="Rate">
+            <input type="text" name="itemName[]" list="bill-stock-list" placeholder="Description of goods" autocomplete="off">
+            <input type="number" name="itemCtns[]" inputmode="decimal" step="0.01" min="0" placeholder="CTNS">
+            <input type="number" name="itemWeight[]" inputmode="decimal" step="0.01" min="0" placeholder="Weight">
+            <input type="number" name="itemPerKg[]" inputmode="decimal" step="0.01" min="0" placeholder="Per KG">
             <span class="bill-line-amt">0</span>
             <button type="button" class="btn-icon btn-remove-bill-line" aria-label="Remove item">&times;</button>
         </div>
@@ -3061,22 +3096,43 @@ function renderCreateBillForm() {
         .map(c => `<option value="${c.id}">${escapeHtml(c.name)} · #${escapeHtml(c.khataNo)}</option>`)
         .join('');
     return `
-        <p class="form-hint">This bill is saved on the Bills page and posted as Banam on the party's khata.</p>
-        <div class="form-group">
-            <label>Party</label>
-            <select name="customerId" required>
-                <option value="">Select party</option>
-                ${parties}
-            </select>
+        <p class="form-hint">Amount is Weight × Per KG. This bill is saved here and posted as Banam on the party's khata.</p>
+        <div class="form-row">
+            <div class="form-group flex-1">
+                <label>Party</label>
+                <select name="customerId" required>
+                    <option value="">Select party</option>
+                    ${parties}
+                </select>
+            </div>
+            <div class="form-group flex-1">
+                <label>Date</label>
+                <input type="date" name="billDate" value="${localISODate()}" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group flex-1">
+                <label>Bill of Entry No</label>
+                <input type="text" name="entryNo" placeholder="B/E or GD number">
+            </div>
+            <div class="form-group flex-1">
+                <label>Container No</label>
+                <input type="text" name="containerNo" placeholder="e.g. MSKU 1234567">
+            </div>
         </div>
         <div class="form-group">
-            <label>Date</label>
-            <input type="date" name="billDate" value="${localISODate()}" required>
+            <label>Vehicle / Truck No (optional)</label>
+            <input type="text" name="vehicleNo" placeholder="Delivery vehicle number">
         </div>
         <div class="form-group">
-            <label>Items</label>
+            <label>Goods</label>
             <div class="bill-line-head">
-                <span>Item</span><span>Qty</span><span>Rate</span><span>Amount</span><span></span>
+                <span>Description of goods</span>
+                <span>CTNS</span>
+                <span>Weight (KGS)</span>
+                <span>Per KG</span>
+                <span>How much</span>
+                <span></span>
             </div>
             <div id="bill-lines">${billLineHtml()}${billLineHtml()}</div>
             <datalist id="bill-stock-list">${stockOptionsList()}</datalist>
@@ -3085,11 +3141,12 @@ function renderCreateBillForm() {
             </button>
         </div>
         <div class="bill-form-total">
-            Total <strong id="bill-form-total">0</strong>
+            <span id="bill-form-counts">0 CTNS · 0 KGS</span>
+            <strong id="bill-form-total">0</strong>
         </div>
         <div class="form-group">
             <label>Note (optional)</label>
-            <input type="text" name="note" placeholder="e.g. Shop delivery, cash later">
+            <input type="text" name="note" placeholder="Remarks, origin, or packing">
         </div>
         <div class="modal-footer">
             <button type="submit" class="btn btn-primary full-width">Save bill as Banam</button>
@@ -3101,16 +3158,25 @@ function recalcBillForm(form) {
     if (!form) return;
     const currency = db.data.settings.currency || 'Rs.';
     let total = 0;
+    let ctns = 0;
+    let weight = 0;
     form.querySelectorAll('.bill-line').forEach(row => {
-        const qty = Number(row.querySelector('[name="itemQty[]"]')?.value) || 0;
-        const rate = Number(row.querySelector('[name="itemRate[]"]')?.value) || 0;
-        const amount = qty * rate;
+        const item = {
+            ctns: row.querySelector('[name="itemCtns[]"]')?.value,
+            weight: row.querySelector('[name="itemWeight[]"]')?.value,
+            perKg: row.querySelector('[name="itemPerKg[]"]')?.value
+        };
+        const amount = billLineAmount(item);
         total += amount;
+        ctns += Number(item.ctns) || 0;
+        weight += Number(item.weight) || 0;
         const amt = row.querySelector('.bill-line-amt');
         if (amt) amt.textContent = amount ? formatAmount(amount) : '0';
     });
     const totalEl = form.querySelector('#bill-form-total');
+    const countsEl = form.querySelector('#bill-form-counts');
     if (totalEl) totalEl.textContent = formatMoney(total, currency);
+    if (countsEl) countsEl.textContent = `${formatAmount(ctns)} CTNS · ${formatAmount(weight)} KGS`;
 }
 
 function wireBillForm(form) {
@@ -3133,7 +3199,7 @@ function wireBillForm(form) {
         const row = e.target.closest('.bill-line');
         if (e.target.name === 'itemName[]' && row) {
             const stock = (db.data.stock || []).find(s => String(s.name).toLowerCase() === e.target.value.toLowerCase());
-            const rateInput = row.querySelector('[name="itemRate[]"]');
+            const rateInput = row.querySelector('[name="itemPerKg[]"]');
             if (stock && rateInput && !rateInput.value) {
                 rateInput.value = stock.sellPrice || stock.buyPrice || '';
             }
@@ -3145,8 +3211,9 @@ function wireBillForm(form) {
 function collectBillItems(form) {
     return [...form.querySelectorAll('.bill-line')].map(row => ({
         name: row.querySelector('[name="itemName[]"]')?.value || '',
-        qty: row.querySelector('[name="itemQty[]"]')?.value,
-        rate: row.querySelector('[name="itemRate[]"]')?.value
+        ctns: row.querySelector('[name="itemCtns[]"]')?.value,
+        weight: row.querySelector('[name="itemWeight[]"]')?.value,
+        perKg: row.querySelector('[name="itemPerKg[]"]')?.value
     }));
 }
 
@@ -3410,10 +3477,13 @@ function handleFormSubmit(formData) {
             customerId,
             date: formData.get('billDate'),
             items,
-            note: formData.get('note')
+            note: formData.get('note'),
+            entryNo: formData.get('entryNo'),
+            containerNo: formData.get('containerNo'),
+            vehicleNo: formData.get('vehicleNo')
         });
         if (!bill) {
-            showToast('Add at least one item with quantity and rate.', 'error');
+            showToast('Add goods with weight and per KG, or CTNS and per KG.', 'error');
             return false;
         }
         const party = db.data.customers.find(c => c.id == customerId);
@@ -3788,7 +3858,13 @@ function updateBillsList() {
 
     listEl.innerHTML = bills.map(bill => {
         const party = db.data.customers.find(c => c.id == bill.customerId);
-        const items = (bill.items || []).map(i => i.name).filter(Boolean).slice(0, 3).join(', ');
+        const items = (bill.items || []).map(i => billItemView(i).name).filter(Boolean).slice(0, 3).join(', ');
+        const meta = [
+            formatDisplayDate(bill.date),
+            bill.entryNo && `B/E ${bill.entryNo}`,
+            bill.containerNo && `Cont ${bill.containerNo}`,
+            items
+        ].filter(Boolean).join(' · ');
         return `
             <div class="bill-item" data-id="${bill.id}" role="button" tabindex="0">
                 <div class="bill-item-main">
@@ -3797,10 +3873,7 @@ function updateBillsList() {
                         <span class="khata-side-badge banam">Banam</span>
                     </div>
                     <div class="bill-item-party">${escapeHtml(party?.name || 'Party removed')}</div>
-                    <div class="bill-item-meta">
-                        ${escapeHtml(formatDisplayDate(bill.date))}
-                        ${items ? ` · ${escapeHtml(items)}` : ''}
-                    </div>
+                    <div class="bill-item-meta">${escapeHtml(meta)}</div>
                 </div>
                 <div class="bill-item-total">
                     <strong>${escapeHtml(currency)} ${formatAmount(bill.total)}</strong>
@@ -3821,17 +3894,29 @@ function printBill(billId) {
     const party = db.data.customers.find(c => c.id == bill.customerId);
     const currency = db.data.settings.currency || 'Rs.';
     const shopName = db.data.settings.shopName || 'My Business';
-    const items = bill.items || [];
+    const items = (bill.items || []).map(billItemView);
+    let totalCtns = 0;
+    let totalWeight = 0;
     const rows = items.length
-        ? items.map((item, i) => `
+        ? items.map((item, i) => {
+            totalCtns += item.ctns;
+            totalWeight += item.weight;
+            return `
             <tr class="${i % 2 ? 'alt' : ''}">
-                <td>${escapeHtml(item.name)}</td>
-                <td class="num">${formatAmount(item.qty)}</td>
-                <td class="num">${formatAmount(item.rate)}</td>
-                <td class="num">${formatAmount(item.amount || (item.qty * item.rate))}</td>
-            </tr>
-        `).join('')
-        : '<tr><td colspan="4" class="empty-cell">No items</td></tr>';
+                <td class="particulars">${escapeHtml(item.name)}</td>
+                <td class="num">${item.ctns ? formatAmount(item.ctns) : '—'}</td>
+                <td class="num">${item.weight ? formatAmount(item.weight) : '—'}</td>
+                <td class="num">${item.perKg ? formatAmount(item.perKg) : '—'}</td>
+                <td class="num">${formatAmount(item.amount)}</td>
+            </tr>`;
+        }).join('')
+        : '<tr><td colspan="5" class="empty-cell">No goods</td></tr>';
+
+    const shipBits = [
+        bill.entryNo ? `<div><span>Bill of Entry No</span><strong>${escapeHtml(bill.entryNo)}</strong></div>` : '',
+        bill.containerNo ? `<div><span>Container No</span><strong>${escapeHtml(bill.containerNo)}</strong></div>` : '',
+        bill.vehicleNo ? `<div><span>Vehicle No</span><strong>${escapeHtml(bill.vehicleNo)}</strong></div>` : ''
+    ].filter(Boolean).join('');
 
     const html = `
         <div class="print-report ledger-print-report">
@@ -3853,24 +3938,29 @@ function printBill(billId) {
                     <em>${escapeHtml(party?.phone || '')}</em>
                 </div>
                 <div class="ledger-print-close">
-                    <span>Amount</span>
+                    <span>How much</span>
                     <strong>${escapeHtml(currency)} ${formatAmount(bill.total)}</strong>
                     <em>Banam on khata</em>
                 </div>
             </div>
+            ${shipBits ? `<div class="bill-print-ship">${shipBits}</div>` : ''}
             <table class="ledger-print-table">
                 <thead>
                     <tr>
-                        <th>Item</th>
-                        <th class="num">Qty</th>
-                        <th class="num">Rate</th>
-                        <th class="num">Amount</th>
+                        <th>Description of goods</th>
+                        <th class="num">CTNS</th>
+                        <th class="num">Weight (KGS)</th>
+                        <th class="num">Per KG</th>
+                        <th class="num">How much</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="3">Total</td>
+                        <td>Total</td>
+                        <td class="num">${formatAmount(totalCtns)}</td>
+                        <td class="num">${formatAmount(totalWeight)}</td>
+                        <td></td>
                         <td class="num">${escapeHtml(currency)} ${formatAmount(bill.total)}</td>
                     </tr>
                 </tfoot>

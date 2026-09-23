@@ -802,7 +802,7 @@ body.dark-theme .nav-link:hover {
 }
 
 .modal-card.modal-wide {
-    max-width: 740px;
+    max-width: 880px;
     max-height: 85vh;
     display: flex;
     flex-direction: column;
@@ -1253,13 +1253,13 @@ body.dark-theme .form-group.highlight {
 .bill-line-head,
 .bill-line {
     display: grid;
-    grid-template-columns: 1.6fr 0.7fr 0.8fr 0.7fr 36px;
+    grid-template-columns: 1.7fr 0.55fr 0.7fr 0.7fr 0.75fr 36px;
     gap: 0.4rem;
     align-items: center;
 }
 
 .bill-line-head {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -1292,6 +1292,7 @@ body.dark-theme .form-group.highlight {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 0.75rem;
     padding: 0.75rem 0.9rem;
     margin-bottom: 0.85rem;
     border: 1px solid var(--border);
@@ -1304,6 +1305,29 @@ body.dark-theme .form-group.highlight {
     font-size: 1.15rem;
 }
 
+.bill-print-ship {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.65rem;
+    border: 1px solid #111;
+    padding: 0.65rem 0.8rem;
+    margin-bottom: 0.75rem;
+}
+
+.bill-print-ship span {
+    display: block;
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.bill-print-ship strong {
+    display: block;
+    font-size: 11pt;
+    margin-top: 0.1rem;
+}
+
 @media (max-width: 640px) {
     .bill-line-head {
         display: none;
@@ -1312,12 +1336,14 @@ body.dark-theme .form-group.highlight {
         grid-template-columns: 1fr 1fr;
         grid-template-areas:
             "name name"
-            "qty rate"
-            "amt remove";
+            "ctns weight"
+            "perkg amt"
+            "remove remove";
     }
     .bill-line input[name="itemName[]"] { grid-area: name; }
-    .bill-line input[name="itemQty[]"] { grid-area: qty; }
-    .bill-line input[name="itemRate[]"] { grid-area: rate; }
+    .bill-line input[name="itemCtns[]"] { grid-area: ctns; }
+    .bill-line input[name="itemWeight[]"] { grid-area: weight; }
+    .bill-line input[name="itemPerKg[]"] { grid-area: perkg; }
     .bill-line-amt { grid-area: amt; text-align: left; padding-left: 0.2rem; }
     .bill-line .btn-remove-bill-line { grid-area: remove; justify-self: end; }
 }
@@ -2600,6 +2626,28 @@ body.print-preview-open {
         border: 1px solid #111 !important;
         padding: 0.7rem 0.85rem !important;
         margin-bottom: 0.85rem !important;
+    }
+
+    .bill-print-ship {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 0.5rem !important;
+        border: 1px solid #111 !important;
+        padding: 0.55rem 0.75rem !important;
+        margin-bottom: 0.75rem !important;
+    }
+
+    .bill-print-ship span {
+        display: block !important;
+        font-size: 8pt !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+    }
+
+    .bill-print-ship strong {
+        display: block !important;
+        font-size: 11pt !important;
+        margin-top: 0.1rem !important;
     }
 
     .ledger-print-party span,
