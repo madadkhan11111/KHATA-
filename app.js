@@ -4363,6 +4363,7 @@ function billListRowHtml(bill, currency, { compact } = {}) {
     const meta = compact
         ? `#${bill.billNo}${items ? ` · ${items}` : ''}`
         : [
+            `#${bill.billNo}`,
             formatDisplayDate(bill.date),
             bill.entryNo && `B/E ${bill.entryNo}`,
             bill.containerNo && `Cont ${bill.containerNo}`,
@@ -4373,8 +4374,8 @@ function billListRowHtml(bill, currency, { compact } = {}) {
             <div class="bill-item-main">
                 <div class="bill-item-top">
                     <strong>${escapeHtml(party?.name || 'Party removed')}</strong>
+                    <span class="bill-item-meta">${escapeHtml(meta)}</span>
                 </div>
-                <div class="bill-item-meta">${escapeHtml(meta)}</div>
             </div>
             <div class="bill-item-total">
                 <strong>${escapeHtml(currency)} ${formatAmount(bill.total)}</strong>
@@ -4425,13 +4426,13 @@ function updateBillsList() {
         return `
             <div class="bill-group">
                 <div class="bill-group-head">
-                    <div>
-                        <strong>Container ${escapeHtml(first.containerNo || '—')}</strong>
-                        <div class="bill-item-meta">${escapeHtml([
+                    <div class="bill-item-top">
+                        <strong>${escapeHtml(first.containerNo || 'Container')}</strong>
+                        <span class="bill-item-meta">${escapeHtml([
                             formatDisplayDate(first.date),
                             first.entryNo && `B/E ${first.entryNo}`,
                             `${list.length} parties`
-                        ].filter(Boolean).join(' · '))}</div>
+                        ].filter(Boolean).join(' · '))}</span>
                     </div>
                     <div class="bill-item-total">
                         <strong>${escapeHtml(currency)} ${formatAmount(total)}</strong>
